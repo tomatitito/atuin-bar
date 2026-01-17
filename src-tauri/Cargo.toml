@@ -1,11 +1,16 @@
 [package]
 name = "atuin-bar"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Spotlight-like overlay interface for atuin shell history search"
+authors = []
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/atuin-bar"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+# This package is its own workspace root
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -23,4 +28,11 @@ tauri-plugin-opener = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Better optimization at cost of compile time
+panic = "abort"     # Reduce binary size
+strip = true        # Strip symbols from binary
 
