@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 // Check if we're running in Tauri context
 function isTauri(): boolean {
-  return typeof window !== 'undefined' &&
-         '__TAURI_INTERNALS__' in window;
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
 let greetInputEl: HTMLInputElement | null;
@@ -48,10 +48,10 @@ async function copyToClipboard() {
 function parseAtuinLine(line: string): AtuinResult | null {
   // Format: {command}|{exit}|{directory}|{time}
   // Note: command can contain '|' characters, so we split from the right
-  const parts = line.split('|');
+  const parts = line.split("|");
   if (parts.length >= 4) {
     // Join all parts except the last 3 to handle pipes in commands
-    const command = parts.slice(0, -3).join('|');
+    const command = parts.slice(0, -3).join("|");
     const exit = parts[parts.length - 3];
     const directory = parts[parts.length - 2];
     const time = parts[parts.length - 1];
@@ -63,7 +63,8 @@ function parseAtuinLine(line: string): AtuinResult | null {
 async function searchAtuin() {
   if (atuinMsgEl && atuinInputEl && atuinResultsEl) {
     if (!isTauri()) {
-      atuinMsgEl.textContent = "Error: Not running in Tauri context. Please run with 'npm run tauri dev'";
+      atuinMsgEl.textContent =
+        "Error: Not running in Tauri context. Please run with 'npm run tauri dev'";
       atuinMsgEl.style.color = "red";
       return;
     }
@@ -82,7 +83,7 @@ async function searchAtuin() {
         return;
       }
 
-      const lines = output.split('\n').filter(line => line.trim() !== '');
+      const lines = output.split("\n").filter((line) => line.trim() !== "");
       const results: AtuinResult[] = [];
 
       for (const line of lines) {
@@ -102,25 +103,25 @@ async function searchAtuin() {
       atuinMsgEl.style.color = "green";
 
       // Display results
-      const resultsList = document.createElement('ul');
-      resultsList.style.textAlign = 'left';
-      resultsList.style.maxHeight = '400px';
-      resultsList.style.overflowY = 'auto';
+      const resultsList = document.createElement("ul");
+      resultsList.style.textAlign = "left";
+      resultsList.style.maxHeight = "400px";
+      resultsList.style.overflowY = "auto";
 
       for (const result of results) {
-        const li = document.createElement('li');
-        li.style.marginBottom = '10px';
-        li.style.padding = '8px';
-        li.style.backgroundColor = '#f5f5f5';
-        li.style.borderRadius = '4px';
+        const li = document.createElement("li");
+        li.style.marginBottom = "10px";
+        li.style.padding = "8px";
+        li.style.backgroundColor = "#f5f5f5";
+        li.style.borderRadius = "4px";
 
-        const commandEl = document.createElement('code');
+        const commandEl = document.createElement("code");
         commandEl.textContent = result.command;
-        commandEl.style.display = 'block';
-        commandEl.style.marginBottom = '4px';
+        commandEl.style.display = "block";
+        commandEl.style.marginBottom = "4px";
 
-        const metaEl = document.createElement('small');
-        metaEl.style.color = '#666';
+        const metaEl = document.createElement("small");
+        metaEl.style.color = "#666";
         metaEl.textContent = `${result.directory} • ${result.time} • exit: ${result.exit}`;
 
         li.appendChild(commandEl);
@@ -158,5 +159,19 @@ window.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#atuin-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
     searchAtuin();
+  });
+
+  // Hide window on Escape key
+  document.addEventListener("keydown", async (e) => {
+    if (e.key === "Escape" && isTauri()) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const window = getCurrentWebviewWindow();
+        await window.hide();
+      } catch (error) {
+        console.error("Failed to hide window:", error);
+      }
+    }
   });
 });
