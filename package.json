@@ -2,6 +2,7 @@
   "name": "atuin-bar",
   "private": true,
   "version": "0.1.0",
+  "description": "Spotlight-like overlay interface for atuin shell history search",
   "type": "module",
   "scripts": {
     "dev": "vite",
