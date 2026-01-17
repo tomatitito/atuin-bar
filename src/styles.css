@@ -12,7 +12,7 @@
   font-weight: 400;
 
   color: #0f0f0f;
-  background-color: #f6f6f6;
+  background-color: transparent;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,13 +21,27 @@
   -webkit-text-size-adjust: 100%;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+}
+
 .container {
   margin: 0;
-  padding-top: 10vh;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   text-align: center;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  min-height: 400px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .logo {
@@ -98,7 +112,11 @@ button {
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
-    background-color: #2f2f2f;
+    background-color: transparent;
+  }
+
+  .container {
+    background-color: rgba(30, 30, 30, 0.85);
   }
 
   a:hover {
