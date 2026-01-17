@@ -23,6 +23,13 @@ fn atuin_search(query: &str) -> Result<String, String> {
         let error_message = String::from_utf8_lossy(&output.stderr);
         Err(format!("atuin command failed: {}", error_message))
     }
+async fn copy_to_clipboard(
+    app: tauri::AppHandle,
+    text: String,
+) -> Result<(), String> {
+    app.clipboard()
+        .write_text(text)
+        .map_err(|e| format!("Failed to copy to clipboard: {}", e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -31,6 +38,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![greet, atuin_search])
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .invoke_handler(tauri::generate_handler![greet, copy_to_clipboard])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
