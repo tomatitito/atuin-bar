@@ -9,35 +9,30 @@
   </head>
 
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
+    <div class="spotlight-container">
+      <div class="search-box">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="Search shell history..."
+          autofocus
+        />
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
-
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
+      <div class="results-container" id="results">
+        <div class="result-item">
+          <div class="result-command">git status</div>
+          <div class="result-meta">~/project • 2 hours ago</div>
+        </div>
+        <div class="result-item">
+          <div class="result-command">npm install</div>
+          <div class="result-meta">~/project • 3 hours ago</div>
+        </div>
+        <div class="result-item">
+          <div class="result-command">cargo build --release</div>
+          <div class="result-meta">~/rust-project • 1 day ago</div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
