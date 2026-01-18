@@ -13,9 +13,13 @@ fn greet(name: &str) -> String {
 pub fn atuin_search(query: &str) -> Result<String, String> {
     let output = Command::new("atuin")
         .arg("search")
-        .arg(query)
+        .arg("--search-mode")
+        .arg("prefix")
+        .arg("--limit")
+        .arg("50")
         .arg("--format")
         .arg("{command}|{exit}|{directory}|{time}")
+        .arg(query)
         .output()
         .map_err(|e| format!("Failed to execute atuin command: {}", e))?;
 

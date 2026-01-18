@@ -82,6 +82,7 @@ async function searchAtuin() {
   if (!atuinInputEl || !atuinResultsEl) return;
 
   const query = atuinInputEl.value.trim();
+  console.log("searchAtuin called with query:", query);
 
   if (!query) {
     atuinResultsEl.innerHTML = "";
@@ -95,9 +96,12 @@ async function searchAtuin() {
   }
 
   try {
+    console.log("Invoking atuin_search_command...");
     const output: string = await invoke("atuin_search_command", { query });
+    console.log("Got output:", output);
 
     if (!output || output.trim() === "") {
+      console.log("Empty output");
       atuinResultsEl.innerHTML = "";
       resizeWindow(0);
       return;
@@ -113,7 +117,8 @@ async function searchAtuin() {
       }
     }
 
-    renderResults(results);
+    console.log("Parsed results:", results.length);
+    renderResults(results.reverse());
   } catch (error) {
     console.error("Atuin search error:", error);
     atuinResultsEl.innerHTML = "";
