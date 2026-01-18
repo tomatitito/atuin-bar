@@ -9,17 +9,67 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+/// Search filters for atuin queries
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct SearchFilters {
+    /// Filter by directory path
+    pub directory: Option<String>,
+    /// Filter by exit code: "success" (0), "failure" (non-0), or None (all)
+    pub exit_filter: Option<String>,
+    /// Time range: "1h", "24h", "7d", "30d", or None (all)
+    pub time_range: Option<String>,
+}
+
 // Public function that can be called from integration tests
-pub fn atuin_search(query: &str) -> Result<String, String> {
-    let output = Command::new("atuin")
-        .arg("search")
+pub fn atuin_search(query: &str, filters: Option<SearchFilters>) -> Result<String, String> {
+    let mut cmd = Command::new("atuin");
+    cmd.arg("search")
         .arg("--search-mode")
         .arg("prefix")
         .arg("--limit")
         .arg("50")
         .arg("--format")
-        .arg("{command}|{exit}|{directory}|{time}")
-        .arg(query)
+        .arg("{command}|{exit}|{directory}|{time}");
+
+    let filters = filters.unwrap_or_default();
+
+    // Apply directory filter
+    if let Some(ref dir) = filters.directory {
+        if !dir.is_empty() {
+            cmd.arg("--cwd").arg(dir);
+        }
+    }
+
+    // Apply exit code filter
+    if let Some(ref exit_filter) = filters.exit_filter {
+        match exit_filter.as_str() {
+            "success" => {
+                cmd.arg("--exit").arg("0");
+            }
+            "failure" => {
+                cmd.arg("--exclude-exit").arg("0");
+            }
+            _ => {}
+        }
+    }
+
+    // Apply time range filter
+    if let Some(ref time_range) = filters.time_range {
+        let after = match time_range.as_str() {
+            "1h" => Some("1 hour ago"),
+            "24h" => Some("1 day ago"),
+            "7d" => Some("7 days ago"),
+            "30d" => Some("30 days ago"),
+            _ => None,
+        };
+        if let Some(after_str) = after {
+            cmd.arg("--after").arg(after_str);
+        }
+    }
+
+    cmd.arg(query);
+
+    let output = cmd
         .output()
         .map_err(|e| format!("Failed to execute atuin command: {}", e))?;
 
@@ -33,8 +83,8 @@ pub fn atuin_search(query: &str) -> Result<String, String> {
 
 // Tauri command wrapper (private)
 #[tauri::command]
-fn atuin_search_command(query: &str) -> Result<String, String> {
-    atuin_search(query)
+fn atuin_search_command(query: &str, filters: Option<SearchFilters>) -> Result<String, String> {
+    atuin_search(query, filters)
 }
 
 #[tauri::command]

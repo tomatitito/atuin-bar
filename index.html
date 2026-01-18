@@ -12,7 +12,36 @@
     <main class="container">
       <form id="atuin-form">
         <input id="atuin-input" placeholder="Search shell history..." autofocus />
+        <button type="button" id="filter-toggle" title="Toggle filters">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/>
+          </svg>
+        </button>
       </form>
+      <div id="filter-panel" class="filter-panel hidden">
+        <div class="filter-group">
+          <label for="filter-directory">Directory</label>
+          <input type="text" id="filter-directory" placeholder="e.g. ~/projects" />
+        </div>
+        <div class="filter-group">
+          <label for="filter-exit">Exit Code</label>
+          <select id="filter-exit">
+            <option value="">All</option>
+            <option value="success">Success (0)</option>
+            <option value="failure">Failure (≠0)</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-time">Time Range</label>
+          <select id="filter-time">
+            <option value="">All time</option>
+            <option value="1h">Last hour</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+          </select>
+        </div>
+      </div>
       <div id="atuin-results"></div>
     </main>
   </body>

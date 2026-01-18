@@ -8,14 +8,27 @@ function isTauri(): boolean {
 
 let atuinInputEl: HTMLInputElement | null;
 let atuinResultsEl: HTMLElement | null;
+let filterToggleEl: HTMLButtonElement | null;
+let filterPanelEl: HTMLElement | null;
+let filterDirectoryEl: HTMLInputElement | null;
+let filterExitEl: HTMLSelectElement | null;
+let filterTimeEl: HTMLSelectElement | null;
 let selectedIndex = -1;
 let currentResults: AtuinResult[] = [];
+let filtersVisible = false;
 
 const BASE_HEIGHT = 60;
+const FILTER_PANEL_HEIGHT = 72;
 const RESULT_HEIGHT = 48;
 const CONTAINER_PADDING = 16;
 const MAX_VISIBLE_RESULTS = 10;
 const WINDOW_WIDTH = 700;
+
+interface SearchFilters {
+  directory?: string;
+  exit_filter?: string;
+  time_range?: string;
+}
 
 interface AtuinResult {
   command: string;
@@ -36,12 +49,37 @@ function parseAtuinLine(line: string): AtuinResult | null {
   return null;
 }
 
+function getFilters(): SearchFilters | undefined {
+  const filters: SearchFilters = {};
+  
+  if (filterDirectoryEl?.value) {
+    filters.directory = filterDirectoryEl.value;
+  }
+  if (filterExitEl?.value) {
+    filters.exit_filter = filterExitEl.value;
+  }
+  if (filterTimeEl?.value) {
+    filters.time_range = filterTimeEl.value;
+  }
+  
+  return Object.keys(filters).length > 0 ? filters : undefined;
+}
+
+function hasActiveFilters(): boolean {
+  return !!(
+    filterDirectoryEl?.value ||
+    filterExitEl?.value ||
+    filterTimeEl?.value
+  );
+}
+
 async function resizeWindow(resultCount: number) {
   if (!isTauri()) return;
 
   const visibleCount = Math.min(resultCount, MAX_VISIBLE_RESULTS);
   const resultsHeight = visibleCount > 0 ? visibleCount * RESULT_HEIGHT + CONTAINER_PADDING : 0;
-  const newHeight = BASE_HEIGHT + resultsHeight;
+  const filterHeight = filtersVisible ? FILTER_PANEL_HEIGHT : 0;
+  const newHeight = BASE_HEIGHT + filterHeight + resultsHeight;
 
   try {
     const window = getCurrentWebviewWindow();
@@ -110,7 +148,8 @@ async function searchAtuin() {
 
   try {
     console.log("Invoking atuin_search_command...");
-    const output: string = await invoke("atuin_search_command", { query });
+    const filters = getFilters();
+    const output: string = await invoke("atuin_search_command", { query, filters });
     console.log("Got output:", output);
 
     if (!output || output.trim() === "") {
@@ -148,14 +187,45 @@ function debounceSearch() {
   searchTimeout = setTimeout(searchAtuin, 150);
 }
 
+function toggleFilters() {
+  filtersVisible = !filtersVisible;
+  filterPanelEl?.classList.toggle("hidden", !filtersVisible);
+  filterToggleEl?.classList.toggle("active", filtersVisible || hasActiveFilters());
+  resizeWindow(currentResults.length);
+}
+
+function updateFilterToggleState() {
+  filterToggleEl?.classList.toggle("active", filtersVisible || hasActiveFilters());
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   atuinInputEl = document.querySelector("#atuin-input");
   atuinResultsEl = document.querySelector("#atuin-results");
+  filterToggleEl = document.querySelector("#filter-toggle");
+  filterPanelEl = document.querySelector("#filter-panel");
+  filterDirectoryEl = document.querySelector("#filter-directory");
+  filterExitEl = document.querySelector("#filter-exit");
+  filterTimeEl = document.querySelector("#filter-time");
 
   if (atuinInputEl) {
     atuinInputEl.addEventListener("input", debounceSearch);
     atuinInputEl.focus();
   }
+
+  filterToggleEl?.addEventListener("click", toggleFilters);
+  
+  filterDirectoryEl?.addEventListener("input", () => {
+    updateFilterToggleState();
+    debounceSearch();
+  });
+  filterExitEl?.addEventListener("change", () => {
+    updateFilterToggleState();
+    debounceSearch();
+  });
+  filterTimeEl?.addEventListener("change", () => {
+    updateFilterToggleState();
+    debounceSearch();
+  });
 
   document.querySelector("#atuin-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -170,6 +240,12 @@ window.addEventListener("DOMContentLoaded", () => {
         const window = getCurrentWebviewWindow();
         if (atuinInputEl) atuinInputEl.value = "";
         if (atuinResultsEl) atuinResultsEl.innerHTML = "";
+        if (filterDirectoryEl) filterDirectoryEl.value = "";
+        if (filterExitEl) filterExitEl.value = "";
+        if (filterTimeEl) filterTimeEl.value = "";
+        if (filterPanelEl) filterPanelEl.classList.add("hidden");
+        filtersVisible = false;
+        updateFilterToggleState();
         currentResults = [];
         selectedIndex = -1;
         await resizeWindow(0);

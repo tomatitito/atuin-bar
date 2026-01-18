@@ -1,4 +1,4 @@
-use atuin_bar_lib::atuin_search;
+use atuin_bar_lib::{atuin_search, SearchFilters};
 
 // Helper function to parse atuin output
 // Format: {command}|{exit}|{directory}|{time}
@@ -21,7 +21,7 @@ fn parse_atuin_line(line: &str) -> Option<(String, String, String, String)> {
 #[test]
 fn test_atuin_search_e2e() {
     // This is a real end-to-end test that calls the actual atuin command
-    let result = atuin_search("ls");
+    let result = atuin_search("ls", None);
 
     // Check if atuin is installed
     match result {
@@ -76,7 +76,7 @@ fn test_atuin_search_e2e() {
 #[test]
 fn test_atuin_search_empty_query() {
     // Test with empty query - should still work if atuin is installed
-    let result = atuin_search("");
+    let result = atuin_search("", None);
 
     match result {
         Ok(_) => {
@@ -105,7 +105,7 @@ fn test_atuin_search_special_characters() {
     ];
 
     for query in queries {
-        let result = atuin_search(query);
+        let result = atuin_search(query, None);
 
         // We don't care if it finds results or not, just that it doesn't crash
         match result {
@@ -134,7 +134,7 @@ fn test_atuin_search_special_characters() {
 #[test]
 fn test_atuin_search_output_format() {
     // Test that the output format is correct when atuin is available
-    let result = atuin_search("cargo");
+    let result = atuin_search("cargo", None);
 
     if let Ok(output) = result {
         if !output.is_empty() {
@@ -161,6 +161,54 @@ fn test_atuin_search_output_format() {
                 assert!(!time.is_empty(), "Timestamp should not be empty");
             }
             // If no lines are parseable, that's OK - might be all multi-line commands
+        }
+    }
+}
+
+#[test]
+fn test_atuin_search_with_filters() {
+    // Test with various filter combinations
+    let filters = SearchFilters {
+        directory: Some("/tmp".to_string()),
+        exit_filter: Some("success".to_string()),
+        time_range: Some("7d".to_string()),
+    };
+
+    let result = atuin_search("", Some(filters));
+
+    match result {
+        Ok(_) => {
+            // Filters were applied successfully (may return empty results)
+        }
+        Err(e) => {
+            assert!(
+                e.contains("Failed to execute atuin command") ||
+                e.contains("atuin command failed"),
+                "Error should be a known atuin error type, got: {}",
+                e
+            );
+        }
+    }
+}
+
+#[test]
+fn test_atuin_search_exit_filter_failure() {
+    let filters = SearchFilters {
+        directory: None,
+        exit_filter: Some("failure".to_string()),
+        time_range: None,
+    };
+
+    let result = atuin_search("git", Some(filters));
+
+    // Should work and only return failed commands
+    if let Ok(output) = result {
+        if !output.is_empty() {
+            for line in output.lines() {
+                if let Some((_, exit, _, _)) = parse_atuin_line(line) {
+                    assert_ne!(exit, "0", "Failure filter should exclude exit code 0");
+                }
+            }
         }
     }
 }
