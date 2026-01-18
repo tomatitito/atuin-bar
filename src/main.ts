@@ -8,6 +8,8 @@ function isTauri(): boolean {
 
 let atuinInputEl: HTMLInputElement | null;
 let atuinResultsEl: HTMLElement | null;
+let selectedIndex = -1;
+let currentResults: AtuinResult[] = [];
 
 const BASE_HEIGHT = 60;
 const RESULT_HEIGHT = 48;
@@ -49,16 +51,27 @@ async function resizeWindow(resultCount: number) {
   }
 }
 
+function updateSelection() {
+  if (!atuinResultsEl) return;
+  const rows = atuinResultsEl.querySelectorAll(".result-row");
+  rows.forEach((row, index) => {
+    row.classList.toggle("selected", index === selectedIndex);
+  });
+}
+
 function renderResults(results: AtuinResult[]) {
   if (!atuinResultsEl) return;
 
-  atuinResultsEl.innerHTML = "";
+  const resultsContainer = atuinResultsEl;
+  resultsContainer.innerHTML = "";
+  currentResults = results;
+  selectedIndex = results.length > 0 ? 0 : -1;
 
   if (results.length === 0) return;
 
-  for (const result of results) {
+  results.forEach((result, index) => {
     const row = document.createElement("div");
-    row.className = "result-row";
+    row.className = "result-row" + (index === 0 ? " selected" : "");
 
     const commandEl = document.createElement("span");
     commandEl.className = "result-command";
@@ -72,8 +85,8 @@ function renderResults(results: AtuinResult[]) {
 
     row.appendChild(commandEl);
     row.appendChild(metaEl);
-    atuinResultsEl.appendChild(row);
-  }
+    resultsContainer.appendChild(row);
+  });
 
   resizeWindow(results.length);
 }
@@ -157,10 +170,41 @@ window.addEventListener("DOMContentLoaded", () => {
         const window = getCurrentWebviewWindow();
         if (atuinInputEl) atuinInputEl.value = "";
         if (atuinResultsEl) atuinResultsEl.innerHTML = "";
+        currentResults = [];
+        selectedIndex = -1;
         await resizeWindow(0);
         await window.hide();
       } catch (error) {
         console.error("Failed to hide window:", error);
+      }
+    }
+
+    if (e.key === "ArrowDown" && currentResults.length > 0) {
+      e.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
+      updateSelection();
+    }
+
+    if (e.key === "ArrowUp" && currentResults.length > 0) {
+      e.preventDefault();
+      selectedIndex = Math.max(selectedIndex - 1, 0);
+      updateSelection();
+    }
+
+    if (e.key === "Enter" && selectedIndex >= 0 && selectedIndex < currentResults.length) {
+      e.preventDefault();
+      const selected = currentResults[selectedIndex];
+      try {
+        await invoke("copy_to_clipboard", { text: selected.command });
+        const window = getCurrentWebviewWindow();
+        if (atuinInputEl) atuinInputEl.value = "";
+        if (atuinResultsEl) atuinResultsEl.innerHTML = "";
+        currentResults = [];
+        selectedIndex = -1;
+        await resizeWindow(0);
+        await window.hide();
+      } catch (error) {
+        console.error("Failed to copy to clipboard:", error);
       }
     }
   });
