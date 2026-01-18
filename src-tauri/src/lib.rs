@@ -20,8 +20,7 @@ pub fn atuin_search(query: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to execute atuin command: {}", e))?;
 
     if output.status.success() {
-        String::from_utf8(output.stdout)
-            .map_err(|e| format!("Failed to parse atuin output: {}", e))
+        String::from_utf8(output.stdout).map_err(|e| format!("Failed to parse atuin output: {}", e))
     } else {
         let error_message = String::from_utf8_lossy(&output.stderr);
         Err(format!("atuin command failed: {}", error_message))
@@ -80,7 +79,25 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![greet, atuin_search_command, copy_to_clipboard])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            atuin_search_command,
+            copy_to_clipboard
+        ])
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+
+            let window_clone = window.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Focused(focused) = event {
+                    if !focused {
+                        let _ = window_clone.hide();
+                    }
+                }
+            });
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -88,8 +105,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tauri::test::{mock_builder, mock_context, noop_assets};
     use serial_test::serial;
+    use tauri::test::{mock_builder, mock_context, noop_assets};
 
     #[test]
     fn test_greet() {
@@ -122,7 +139,10 @@ mod tests {
 
         // Verify the text was written to clipboard
         let clipboard_content = app.handle().clipboard().read_text();
-        assert!(clipboard_content.is_ok(), "should be able to read clipboard");
+        assert!(
+            clipboard_content.is_ok(),
+            "should be able to read clipboard"
+        );
         assert_eq!(
             clipboard_content.unwrap(),
             test_text,
@@ -141,7 +161,10 @@ mod tests {
         let empty_text = "".to_string();
         let result = copy_to_clipboard(app.handle().clone(), empty_text).await;
 
-        assert!(result.is_ok(), "copy_to_clipboard should handle empty strings");
+        assert!(
+            result.is_ok(),
+            "copy_to_clipboard should handle empty strings"
+        );
     }
 
     #[tokio::test]
@@ -155,7 +178,10 @@ mod tests {
         let unicode_text = "Hello 世界 🌍".to_string();
         let result = copy_to_clipboard(app.handle().clone(), unicode_text.clone()).await;
 
-        assert!(result.is_ok(), "copy_to_clipboard should handle unicode text");
+        assert!(
+            result.is_ok(),
+            "copy_to_clipboard should handle unicode text"
+        );
 
         let clipboard_content = app.handle().clipboard().read_text();
         assert!(clipboard_content.is_ok());
