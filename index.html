@@ -4,58 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <title>Atuin Bar</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
   <body>
     <main class="container">
-      <h1>Welcome to Tauri</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
-
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
+      <form id="atuin-form">
+        <input id="atuin-input" placeholder="Search shell history..." autofocus />
       </form>
-      <p id="greet-msg"></p>
-
-      <hr />
-
-      <h2>Clipboard Test</h2>
-      <form class="row" id="clipboard-form">
-        <input id="clipboard-input" placeholder="Enter text to copy..." />
-        <button type="submit">Copy to Clipboard</button>
-      </form>
-      <p id="clipboard-msg"></p>
-
-      <hr />
-
-      <h2>Atuin Shell History Search</h2>
-      <form class="row" id="atuin-form">
-        <input id="atuin-input" placeholder="Search shell history..." />
-        <button type="submit">Search</button>
-      </form>
-      <p id="atuin-msg"></p>
       <div id="atuin-results"></div>
     </main>
   </body>
