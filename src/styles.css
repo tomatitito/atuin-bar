@@ -36,6 +36,87 @@ body {
 
 #atuin-form {
   display: flex;
+  gap: 8px;
+}
+
+#filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #666;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+#filter-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #333;
+}
+
+#filter-toggle.active {
+  background-color: rgba(0, 122, 255, 0.12);
+  color: #007aff;
+}
+
+.filter-panel {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  margin-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.filter-panel.hidden {
+  display: none;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.filter-group input,
+.filter-group select {
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #0f0f0f;
+  outline: none;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.filter-group select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
 }
 
 #atuin-input {
@@ -141,6 +222,48 @@ body {
 
   #atuin-input:focus {
     background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  #filter-toggle {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #999;
+  }
+
+  #filter-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #ccc;
+  }
+
+  #filter-toggle.active {
+    background-color: rgba(50, 140, 255, 0.2);
+    color: #4da6ff;
+  }
+
+  .filter-panel {
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .filter-group label {
+    color: #888;
+  }
+
+  .filter-group input,
+  .filter-group select {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #f6f6f6;
+  }
+
+  .filter-group input:focus,
+  .filter-group select:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .filter-group input::placeholder {
+    color: #666;
+  }
+
+  .filter-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
   }
 
   .result-row:hover,
