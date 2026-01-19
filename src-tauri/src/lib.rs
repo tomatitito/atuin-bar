@@ -11,6 +11,10 @@ use tauri_plugin_global_shortcut::ShortcutState;
 pub struct Config {
     /// Global shortcut to toggle the window (e.g., "CommandOrControl+Shift+Space")
     pub shortcut: String,
+    /// Theme: "dark" or "light" (default: "dark")
+    pub theme: String,
+    /// Maximum number of results to display (default: 20)
+    pub max_results: u32,
 }
 
 impl Default for Config {
@@ -21,6 +25,8 @@ impl Default for Config {
             } else {
                 "Control+Shift+Space".to_string()
             },
+            theme: "dark".to_string(),
+            max_results: 20,
         }
     }
 }
@@ -42,9 +48,16 @@ pub fn load_config() -> Config {
             let _ = fs::create_dir_all(parent);
         }
         let default_config = r#"# Atuin Bar Configuration
+
 # Global shortcut to toggle the window
 # Examples: "CommandOrControl+Shift+Space", "Alt+Space", "Super+H"
 shortcut = "CommandOrControl+Shift+Space"
+
+# Theme: "dark" or "light" (default: "dark")
+theme = "dark"
+
+# Maximum number of results to display (default: 20)
+max_results = 20
 "#;
         let _ = fs::write(&config_path, default_config);
         return Config::default();
@@ -66,6 +79,18 @@ shortcut = "CommandOrControl+Shift+Space"
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+#[tauri::command]
+fn get_theme() -> String {
+    let config = load_config();
+    config.theme
+}
+
+#[tauri::command]
+fn get_max_results() -> u32 {
+    let config = load_config();
+    config.max_results
 }
 
 /// Search filters for atuin queries
@@ -192,7 +217,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             atuin_search_command,
-            copy_to_clipboard
+            copy_to_clipboard,
+            get_theme,
+            get_max_results
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

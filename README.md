@@ -22,6 +22,12 @@ The app uses a configuration file at `~/.config/atuin-bar/config.toml`. On first
 # Global shortcut to toggle the window
 # Examples: "CommandOrControl+Shift+Space", "Alt+Space", "Super+H"
 shortcut = "CommandOrControl+Shift+Space"
+
+# Theme: "dark" or "light" (default: "dark")
+theme = "dark"
+
+# Maximum number of results to display (default: 20)
+max_results = 20
 ```
 
 **Note:** Changes require an app restart to take effect.

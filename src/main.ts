@@ -23,9 +23,10 @@ const BASE_HEIGHT = 60;
 const FILTER_PANEL_HEIGHT = 72;
 const RESULT_HEIGHT = 48;
 const CONTAINER_PADDING = 16;
-const MAX_VISIBLE_RESULTS = 10;
 const WINDOW_WIDTH = 700;
 const POPUP_WIDTH = 900;
+
+let maxVisibleResults = 20;
 
 interface SearchFilters {
   directory?: string;
@@ -79,7 +80,7 @@ function hasActiveFilters(): boolean {
 async function resizeWindow(resultCount: number) {
   if (!isTauri()) return;
 
-  const visibleCount = Math.min(resultCount, MAX_VISIBLE_RESULTS);
+  const visibleCount = Math.min(resultCount, maxVisibleResults);
   const resultsHeight = visibleCount > 0 ? visibleCount * RESULT_HEIGHT + CONTAINER_PADDING : 0;
   const filterHeight = filtersVisible ? FILTER_PANEL_HEIGHT : 0;
   const newHeight = BASE_HEIGHT + filterHeight + resultsHeight;
@@ -258,7 +259,29 @@ function updateFilterToggleState() {
   filterToggleEl?.classList.toggle("active", filtersVisible || hasActiveFilters());
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+async function loadConfig() {
+  if (!isTauri()) return;
+  
+  try {
+    const theme: string = await invoke("get_theme");
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+    
+    const configMaxResults: number = await invoke("get_max_results");
+    maxVisibleResults = configMaxResults;
+    
+    if (atuinResultsEl) {
+      atuinResultsEl.style.maxHeight = `${maxVisibleResults * RESULT_HEIGHT}px`;
+    }
+  } catch (error) {
+    console.error("Failed to load config:", error);
+  }
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
   atuinInputEl = document.querySelector("#atuin-input");
   atuinResultsEl = document.querySelector("#atuin-results");
   filterToggleEl = document.querySelector("#filter-toggle");
@@ -267,6 +290,8 @@ window.addEventListener("DOMContentLoaded", () => {
   filterExitEl = document.querySelector("#filter-exit");
   filterTimeEl = document.querySelector("#filter-time");
   commandPopupEl = document.querySelector("#command-popup");
+
+  await loadConfig();
 
   if (atuinInputEl) {
     atuinInputEl.addEventListener("input", debounceSearch);
