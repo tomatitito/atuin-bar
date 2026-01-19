@@ -8,11 +8,23 @@ Atuin Bar provides a macOS Spotlight-style keyboard shortcut and overlay window 
 
 ## Features
 
-- Global keyboard shortcut to show/hide search overlay
+- Global keyboard shortcut to show/hide search overlay (configurable)
 - Spotlight-like UI with center-screen overlay
 - Real-time search through atuin history
 - Keyboard navigation (arrow keys, Enter, Escape)
 - Automatic clipboard copy on selection
+
+## Configuration
+
+The app uses a configuration file at `~/.config/atuin-bar/config.toml`. On first run, a default config file is created automatically.
+
+```toml
+# Global shortcut to toggle the window
+# Examples: "CommandOrControl+Shift+Space", "Alt+Space", "Super+H"
+shortcut = "CommandOrControl+Shift+Space"
+```
+
+**Note:** Changes require an app restart to take effect.
 
 ## Build Configuration
 

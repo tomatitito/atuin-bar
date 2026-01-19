@@ -1,7 +1,66 @@
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::ShortcutState;
+
+/// Application configuration
+#[derive(Debug, serde::Deserialize)]
+#[serde(default)]
+pub struct Config {
+    /// Global shortcut to toggle the window (e.g., "CommandOrControl+Shift+Space")
+    pub shortcut: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            shortcut: if cfg!(target_os = "macos") {
+                "CommandOrControl+Shift+Space".to_string()
+            } else {
+                "Control+Shift+Space".to_string()
+            },
+        }
+    }
+}
+
+/// Get the config file path (~/.config/atuin-bar/config.toml)
+fn get_config_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|p| p.join("atuin-bar").join("config.toml"))
+}
+
+/// Load configuration from file, falling back to defaults
+pub fn load_config() -> Config {
+    let Some(config_path) = get_config_path() else {
+        return Config::default();
+    };
+
+    if !config_path.exists() {
+        // Create default config file for user reference
+        if let Some(parent) = config_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let default_config = r#"# Atuin Bar Configuration
+# Global shortcut to toggle the window
+# Examples: "CommandOrControl+Shift+Space", "Alt+Space", "Super+H"
+shortcut = "CommandOrControl+Shift+Space"
+"#;
+        let _ = fs::write(&config_path, default_config);
+        return Config::default();
+    }
+
+    match fs::read_to_string(&config_path) {
+        Ok(contents) => toml::from_str(&contents).unwrap_or_else(|e| {
+            eprintln!("Failed to parse config file: {}", e);
+            Config::default()
+        }),
+        Err(e) => {
+            eprintln!("Failed to read config file: {}", e);
+            Config::default()
+        }
+    }
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -99,18 +158,15 @@ async fn copy_to_clipboard<R: tauri::Runtime>(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Define the global shortcut: Cmd+Shift+Space (macOS) or Ctrl+Shift+Space (other platforms)
-    let shortcut = if cfg!(target_os = "macos") {
-        "CommandOrControl+Shift+Space"
-    } else {
-        "Control+Shift+Space"
-    };
+    // Load configuration
+    let config = load_config();
+    let shortcut = config.shortcut;
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts([shortcut])
+                .with_shortcuts([shortcut.as_str()])
                 .unwrap()
                 .with_handler(|app, _shortcut, event| {
                     if event.state == ShortcutState::Pressed {
