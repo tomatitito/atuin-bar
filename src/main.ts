@@ -13,9 +13,11 @@ let filterPanelEl: HTMLElement | null;
 let filterDirectoryEl: HTMLInputElement | null;
 let filterExitEl: HTMLSelectElement | null;
 let filterTimeEl: HTMLSelectElement | null;
+let commandPopupEl: HTMLElement | null;
 let selectedIndex = -1;
 let currentResults: AtuinResult[] = [];
 let filtersVisible = false;
+let popupVisible = false;
 
 const BASE_HEIGHT = 60;
 const FILTER_PANEL_HEIGHT = 72;
@@ -23,6 +25,7 @@ const RESULT_HEIGHT = 48;
 const CONTAINER_PADDING = 16;
 const MAX_VISIBLE_RESULTS = 10;
 const WINDOW_WIDTH = 700;
+const POPUP_WIDTH = 900;
 
 interface SearchFilters {
   directory?: string;
@@ -97,6 +100,55 @@ function updateSelection() {
   });
 }
 
+function showPopup(result: AtuinResult, rowEl: Element) {
+  if (!commandPopupEl) return;
+  
+  const popupCommand = commandPopupEl.querySelector(".popup-command");
+  const popupMeta = commandPopupEl.querySelector(".popup-meta");
+  
+  if (popupCommand) {
+    popupCommand.textContent = result.command;
+  }
+  
+  if (popupMeta) {
+    const exitClass = result.exit === "0" ? "exit-success" : "exit-failure";
+    const folderIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3H13.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2.5a2 2 0 0 1-2-2V3.87z"/></svg>`;
+    const clockIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>`;
+    popupMeta.innerHTML = `
+      <span class="popup-meta-item">${folderIcon} ${result.directory}</span>
+      <span class="popup-meta-item">${clockIcon} ${result.time}</span>
+      <span class="popup-meta-item ${exitClass}">Exit: ${result.exit}</span>
+    `;
+  }
+  
+  const rowRect = rowEl.getBoundingClientRect();
+  commandPopupEl.style.top = `${rowRect.bottom + 4}px`;
+  commandPopupEl.classList.remove("hidden");
+  popupVisible = true;
+  
+  resizeWindowForPopup();
+}
+
+function hidePopup() {
+  if (!commandPopupEl || !popupVisible) return;
+  commandPopupEl.classList.add("hidden");
+  popupVisible = false;
+  resizeWindow(currentResults.length);
+}
+
+async function resizeWindowForPopup() {
+  if (!isTauri() || !commandPopupEl) return;
+  
+  try {
+    const window = getCurrentWebviewWindow();
+    const popupRect = commandPopupEl.getBoundingClientRect();
+    const newHeight = popupRect.bottom + 12;
+    await window.setSize(new LogicalSize(POPUP_WIDTH, Math.max(newHeight, 200)));
+  } catch (error) {
+    console.error("Failed to resize window for popup:", error);
+  }
+}
+
 function renderResults(results: AtuinResult[]) {
   if (!atuinResultsEl) return;
 
@@ -123,6 +175,14 @@ function renderResults(results: AtuinResult[]) {
 
     row.appendChild(commandEl);
     row.appendChild(metaEl);
+    
+    row.addEventListener("mouseenter", () => {
+      showPopup(result, row);
+    });
+    row.addEventListener("mouseleave", () => {
+      hidePopup();
+    });
+    
     resultsContainer.appendChild(row);
   });
 
@@ -206,6 +266,7 @@ window.addEventListener("DOMContentLoaded", () => {
   filterDirectoryEl = document.querySelector("#filter-directory");
   filterExitEl = document.querySelector("#filter-exit");
   filterTimeEl = document.querySelector("#filter-time");
+  commandPopupEl = document.querySelector("#command-popup");
 
   if (atuinInputEl) {
     atuinInputEl.addEventListener("input", debounceSearch);
@@ -236,6 +297,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape" && isTauri()) {
       e.preventDefault();
       e.stopPropagation();
+      
+      if (popupVisible) {
+        hidePopup();
+        return;
+      }
+      
       try {
         const window = getCurrentWebviewWindow();
         if (atuinInputEl) atuinInputEl.value = "";
@@ -259,12 +326,24 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
       updateSelection();
+      hidePopup();
     }
 
     if (e.key === "ArrowUp" && currentResults.length > 0) {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
       updateSelection();
+      hidePopup();
+    }
+
+    if (e.key === "h" && selectedIndex >= 0 && selectedIndex < currentResults.length) {
+      e.preventDefault();
+      const selectedRow = atuinResultsEl?.querySelectorAll(".result-row")[selectedIndex];
+      if (selectedRow && !popupVisible) {
+        showPopup(currentResults[selectedIndex], selectedRow);
+      } else {
+        hidePopup();
+      }
     }
 
     if (e.key === "Enter" && selectedIndex >= 0 && selectedIndex < currentResults.length) {
