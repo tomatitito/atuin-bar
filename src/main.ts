@@ -21,12 +21,11 @@ let popupVisible = false;
 
 const BASE_HEIGHT = 60;
 const FILTER_PANEL_HEIGHT = 72;
-const RESULT_HEIGHT = 48;
+const RESULT_HEIGHT = 28;
 const CONTAINER_PADDING = 16;
-const WINDOW_WIDTH = 700;
-const POPUP_WIDTH = 900;
 
 let maxVisibleResults = 20;
+let windowWidth = 700;
 
 interface SearchFilters {
   directory?: string;
@@ -37,25 +36,50 @@ interface SearchFilters {
 interface AtuinResult {
   command: string;
   exit: string;
+  duration: string;
   directory: string;
   time: string;
 }
 
 function parseAtuinLine(line: string): AtuinResult | null {
   const parts = line.split("|");
-  if (parts.length >= 4) {
-    const command = parts.slice(0, -3).join("|");
-    const exit = parts[parts.length - 3];
+  if (parts.length >= 5) {
+    const command = parts.slice(0, -4).join("|");
+    const exit = parts[parts.length - 4];
+    const duration = parts[parts.length - 3];
     const directory = parts[parts.length - 2];
     const time = parts[parts.length - 1];
-    return { command, exit, directory, time };
+    return { command, exit, duration, directory, time };
   }
   return null;
 }
 
+function formatRelativeTime(timestamp: string): string {
+  try {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const diffMonths = Math.floor(diffDays / 30);
+    const diffYears = Math.floor(diffDays / 365);
+
+    if (diffYears > 0) return `${diffYears}y`;
+    if (diffMonths > 0) return `${diffMonths}mo`;
+    if (diffDays > 0) return `${diffDays}d`;
+    if (diffHours > 0) return `${diffHours}h`;
+    if (diffMins > 0) return `${diffMins}m`;
+    return `${diffSecs}s`;
+  } catch {
+    return timestamp;
+  }
+}
+
 function getFilters(): SearchFilters | undefined {
   const filters: SearchFilters = {};
-  
+
   if (filterDirectoryEl?.value) {
     filters.directory = filterDirectoryEl.value;
   }
@@ -65,7 +89,7 @@ function getFilters(): SearchFilters | undefined {
   if (filterTimeEl?.value) {
     filters.time_range = filterTimeEl.value;
   }
-  
+
   return Object.keys(filters).length > 0 ? filters : undefined;
 }
 
@@ -81,13 +105,14 @@ async function resizeWindow(resultCount: number) {
   if (!isTauri()) return;
 
   const visibleCount = Math.min(resultCount, maxVisibleResults);
-  const resultsHeight = visibleCount > 0 ? visibleCount * RESULT_HEIGHT + CONTAINER_PADDING : 0;
+  const resultsHeight =
+    visibleCount > 0 ? visibleCount * RESULT_HEIGHT + CONTAINER_PADDING : 0;
   const filterHeight = filtersVisible ? FILTER_PANEL_HEIGHT : 0;
   const newHeight = BASE_HEIGHT + filterHeight + resultsHeight;
 
   try {
     const window = getCurrentWebviewWindow();
-    await window.setSize(new LogicalSize(WINDOW_WIDTH, newHeight));
+    await window.setSize(new LogicalSize(windowWidth, newHeight));
   } catch (error) {
     console.error("Failed to resize window:", error);
   }
@@ -103,14 +128,14 @@ function updateSelection() {
 
 function showPopup(result: AtuinResult, rowEl: Element) {
   if (!commandPopupEl) return;
-  
+
   const popupCommand = commandPopupEl.querySelector(".popup-command");
   const popupMeta = commandPopupEl.querySelector(".popup-meta");
-  
+
   if (popupCommand) {
     popupCommand.textContent = result.command;
   }
-  
+
   if (popupMeta) {
     const exitClass = result.exit === "0" ? "exit-success" : "exit-failure";
     const folderIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3H13.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2.5a2 2 0 0 1-2-2V3.87z"/></svg>`;
@@ -121,12 +146,12 @@ function showPopup(result: AtuinResult, rowEl: Element) {
       <span class="popup-meta-item ${exitClass}">Exit: ${result.exit}</span>
     `;
   }
-  
+
   const rowRect = rowEl.getBoundingClientRect();
   commandPopupEl.style.top = `${rowRect.bottom + 4}px`;
   commandPopupEl.classList.remove("hidden");
   popupVisible = true;
-  
+
   resizeWindowForPopup();
 }
 
@@ -139,12 +164,14 @@ function hidePopup() {
 
 async function resizeWindowForPopup() {
   if (!isTauri() || !commandPopupEl) return;
-  
+
   try {
     const window = getCurrentWebviewWindow();
     const popupRect = commandPopupEl.getBoundingClientRect();
     const newHeight = popupRect.bottom + 12;
-    await window.setSize(new LogicalSize(POPUP_WIDTH, Math.max(newHeight, 200)));
+    await window.setSize(
+      new LogicalSize(windowWidth, Math.max(newHeight, 200)),
+    );
   } catch (error) {
     console.error("Failed to resize window for popup:", error);
   }
@@ -170,20 +197,21 @@ function renderResults(results: AtuinResult[]) {
 
     const metaEl = document.createElement("span");
     metaEl.className = "result-meta";
-    
+
     const exitClass = result.exit === "0" ? "exit-success" : "exit-failure";
-    metaEl.innerHTML = `<span class="result-time">${result.time}</span> <span class="${exitClass}">${result.exit}</span>`;
+    const relativeTime = formatRelativeTime(result.time);
+    metaEl.innerHTML = `<span class="${exitClass}">${result.duration}</span> <span class="result-time">${relativeTime}</span>`;
 
     row.appendChild(commandEl);
     row.appendChild(metaEl);
-    
+
     row.addEventListener("mouseenter", () => {
       showPopup(result, row);
     });
     row.addEventListener("mouseleave", () => {
       hidePopup();
     });
-    
+
     resultsContainer.appendChild(row);
   });
 
@@ -210,7 +238,10 @@ async function searchAtuin() {
   try {
     console.log("Invoking atuin_search_command...");
     const filters = getFilters();
-    const output: string = await invoke("atuin_search_command", { query, filters });
+    const output: string = await invoke("atuin_search_command", {
+      query,
+      filters,
+    });
     console.log("Got output:", output);
 
     if (!output || output.trim() === "") {
@@ -251,17 +282,23 @@ function debounceSearch() {
 function toggleFilters() {
   filtersVisible = !filtersVisible;
   filterPanelEl?.classList.toggle("hidden", !filtersVisible);
-  filterToggleEl?.classList.toggle("active", filtersVisible || hasActiveFilters());
+  filterToggleEl?.classList.toggle(
+    "active",
+    filtersVisible || hasActiveFilters(),
+  );
   resizeWindow(currentResults.length);
 }
 
 function updateFilterToggleState() {
-  filterToggleEl?.classList.toggle("active", filtersVisible || hasActiveFilters());
+  filterToggleEl?.classList.toggle(
+    "active",
+    filtersVisible || hasActiveFilters(),
+  );
 }
 
 async function loadConfig() {
   if (!isTauri()) return;
-  
+
   try {
     const theme: string = await invoke("get_theme");
     if (theme === "light") {
@@ -269,10 +306,13 @@ async function loadConfig() {
     } else {
       document.documentElement.classList.remove("light");
     }
-    
+
     const configMaxResults: number = await invoke("get_max_results");
     maxVisibleResults = configMaxResults;
-    
+
+    const configWindowWidth: number = await invoke("get_window_width");
+    windowWidth = configWindowWidth;
+
     if (atuinResultsEl) {
       atuinResultsEl.style.maxHeight = `${maxVisibleResults * RESULT_HEIGHT}px`;
     }
@@ -299,7 +339,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   filterToggleEl?.addEventListener("click", toggleFilters);
-  
+
   filterDirectoryEl?.addEventListener("input", () => {
     updateFilterToggleState();
     debounceSearch();
@@ -322,12 +362,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Escape" && isTauri()) {
       e.preventDefault();
       e.stopPropagation();
-      
+
       if (popupVisible) {
         hidePopup();
         return;
       }
-      
+
       try {
         const window = getCurrentWebviewWindow();
         if (atuinInputEl) atuinInputEl.value = "";
@@ -361,9 +401,14 @@ window.addEventListener("DOMContentLoaded", async () => {
       hidePopup();
     }
 
-    if (e.key === "h" && selectedIndex >= 0 && selectedIndex < currentResults.length) {
+    if (
+      e.key === "h" &&
+      selectedIndex >= 0 &&
+      selectedIndex < currentResults.length
+    ) {
       e.preventDefault();
-      const selectedRow = atuinResultsEl?.querySelectorAll(".result-row")[selectedIndex];
+      const selectedRow =
+        atuinResultsEl?.querySelectorAll(".result-row")[selectedIndex];
       if (selectedRow && !popupVisible) {
         showPopup(currentResults[selectedIndex], selectedRow);
       } else {
@@ -371,7 +416,11 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    if (e.key === "Enter" && selectedIndex >= 0 && selectedIndex < currentResults.length) {
+    if (
+      e.key === "Enter" &&
+      selectedIndex >= 0 &&
+      selectedIndex < currentResults.length
+    ) {
       e.preventDefault();
       const selected = currentResults[selectedIndex];
       try {

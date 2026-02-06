@@ -16,7 +16,21 @@ Atuin Bar provides a macOS Spotlight-style keyboard shortcut and overlay window 
 
 ## Configuration
 
-The app uses a configuration file at `~/.config/atuin-bar/config.toml`. On first run, a default config file is created automatically.
+The app can be configured in two ways:
+
+### 1. Settings Menu (Recommended)
+
+Click on the **Atuin-Bar** menu and select **Settings** to open a graphical configuration window. This allows you to:
+- Change the global keyboard shortcut (requires restart)
+- Toggle between dark and light themes
+- Adjust the maximum number of search results displayed
+- Customize the window width
+
+Changes to theme, max results, and window width take effect immediately. Shortcut changes require an app restart.
+
+### 2. Configuration File
+
+The app uses a configuration file at `~/.config/atuin-bar/config.toml`. On first run, a default config file is created automatically. You can also edit this file directly:
 
 ```toml
 # Global shortcut to toggle the window
@@ -28,9 +42,12 @@ theme = "dark"
 
 # Maximum number of results to display (default: 20)
 max_results = 20
+
+# Window width in pixels (default: 700)
+window_width = 700
 ```
 
-**Note:** Changes require an app restart to take effect.
+**Note:** The Settings menu and config file are synchronized - changes made in either location will be reflected in both.
 
 ## Build Configuration
 

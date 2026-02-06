@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::Manager;
+use tauri::{menu::{MenuBuilder, MenuItemBuilder}, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::ShortcutState;
 
 /// Application configuration
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Config {
     /// Global shortcut to toggle the window (e.g., "CommandOrControl+Shift+Space")
@@ -15,6 +15,8 @@ pub struct Config {
     pub theme: String,
     /// Maximum number of results to display (default: 20)
     pub max_results: u32,
+    /// Window width in pixels (default: 700)
+    pub window_width: u32,
 }
 
 impl Default for Config {
@@ -27,12 +29,13 @@ impl Default for Config {
             },
             theme: "dark".to_string(),
             max_results: 20,
+            window_width: 700,
         }
     }
 }
 
 /// Get the config file path (~/.config/atuin-bar/config.toml)
-fn get_config_path() -> Option<PathBuf> {
+pub fn get_config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|p| p.join("atuin-bar").join("config.toml"))
 }
 
@@ -58,6 +61,9 @@ theme = "dark"
 
 # Maximum number of results to display (default: 20)
 max_results = 20
+
+# Window width in pixels (default: 700)
+window_width = 700
 "#;
         let _ = fs::write(&config_path, default_config);
         return Config::default();
@@ -93,6 +99,74 @@ fn get_max_results() -> u32 {
     config.max_results
 }
 
+#[tauri::command]
+fn get_window_width() -> u32 {
+    let config = load_config();
+    config.window_width
+}
+
+#[tauri::command]
+fn get_config() -> Config {
+    load_config()
+}
+
+#[tauri::command]
+fn update_config(
+    shortcut: Option<String>,
+    theme: Option<String>,
+    max_results: Option<u32>,
+    window_width: Option<u32>,
+) -> Result<Config, String> {
+    let Some(config_path) = get_config_path() else {
+        return Err("Could not determine config path".to_string());
+    };
+
+    // Load current config
+    let mut config = load_config();
+
+    // Update fields if provided
+    if let Some(s) = shortcut {
+        config.shortcut = s;
+    }
+    if let Some(t) = theme {
+        config.theme = t;
+    }
+    if let Some(m) = max_results {
+        config.max_results = m;
+    }
+    if let Some(w) = window_width {
+        config.window_width = w;
+    }
+
+    // Serialize to TOML
+    let toml_str = format!(
+        r#"# Atuin Bar Configuration
+
+# Global shortcut to toggle the window
+# Examples: "CommandOrControl+Shift+Space", "Alt+Space", "Super+H"
+shortcut = "{}"
+
+# Theme: "dark" or "light" (default: "dark")
+theme = "{}"
+
+# Maximum number of results to display (default: 20)
+max_results = {}
+
+# Window width in pixels (default: 700)
+window_width = {}
+"#,
+        config.shortcut, config.theme, config.max_results, config.window_width
+    );
+
+    // Write to file
+    if let Some(parent) = config_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::write(&config_path, toml_str).map_err(|e| format!("Failed to write config: {}", e))?;
+
+    Ok(config)
+}
+
 /// Search filters for atuin queries
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct SearchFilters {
@@ -113,7 +187,7 @@ pub fn atuin_search(query: &str, filters: Option<SearchFilters>) -> Result<Strin
         .arg("--limit")
         .arg("50")
         .arg("--format")
-        .arg("{command}|{exit}|{directory}|{time}");
+        .arg("{command}|{exit}|{duration}|{directory}|{time}");
 
     let filters = filters.unwrap_or_default();
 
@@ -214,12 +288,16 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             atuin_search_command,
             copy_to_clipboard,
             get_theme,
-            get_max_results
+            get_max_results,
+            get_window_width,
+            get_config,
+            update_config
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -229,6 +307,44 @@ pub fn run() {
                 if let tauri::WindowEvent::Focused(focused) = event {
                     if !focused {
                         let _ = window_clone.hide();
+                    }
+                }
+            });
+
+            // Create menu
+            let settings_item = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
+            let menu = MenuBuilder::new(app)
+                .item(&settings_item)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            // Handle menu events
+            app.on_menu_event(move |app, event| {
+                if event.id().as_ref() == "settings" {
+                    // Check if settings window already exists
+                    if let Some(settings_window) = app.get_webview_window("settings") {
+                        let _ = settings_window.show();
+                        let _ = settings_window.set_focus();
+                    } else {
+                        // Create settings window
+                        use tauri::WebviewWindowBuilder;
+                        use tauri::WebviewUrl;
+
+                        let settings_window = WebviewWindowBuilder::new(
+                            app,
+                            "settings",
+                            WebviewUrl::App("settings.html".into())
+                        )
+                        .title("Atuin Bar Settings")
+                        .inner_size(500.0, 400.0)
+                        .resizable(false)
+                        .center()
+                        .build();
+
+                        if let Ok(win) = settings_window {
+                            let _ = win.show();
+                        }
                     }
                 }
             });
@@ -326,6 +442,26 @@ mod tests {
             clipboard_content.unwrap(),
             unicode_text,
             "clipboard should preserve unicode characters"
+        );
+    }
+
+    #[test]
+    fn test_config_default_window_width() {
+        let config = Config::default();
+        assert_eq!(
+            config.window_width, 700,
+            "Default window width should be 700"
+        );
+    }
+
+    #[test]
+    fn test_get_window_width_command() {
+        // Test the get_window_width command returns the configured value
+        let width = get_window_width();
+        assert!(
+            width > 0,
+            "Window width should be a positive number, got: {}",
+            width
         );
     }
 }
