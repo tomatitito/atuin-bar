@@ -19,10 +19,10 @@ let currentResults: AtuinResult[] = [];
 let filtersVisible = false;
 let popupVisible = false;
 
-const BASE_HEIGHT = 60;
-const FILTER_PANEL_HEIGHT = 72;
-const RESULT_HEIGHT = 28;
-const CONTAINER_PADDING = 16;
+const BASE_HEIGHT = 38;
+const FILTER_PANEL_HEIGHT = 56;
+const RESULT_HEIGHT = 32;
+const CONTAINER_PADDING = 8;
 
 let maxVisibleResults = 20;
 let windowWidth = 700;
