@@ -1,5 +1,10 @@
 # Atuin Bar
 
+<p align="center">
+  <img src="logo.png" alt="Atuin Bar" width="200" />
+</p>
+
+
 Spotlight-like overlay interface for [atuin](https://github.com/atuinsh/atuin) shell history search.
 
 ## Overview
