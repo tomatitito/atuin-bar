@@ -41,19 +41,6 @@ interface AtuinResult {
   time: string;
 }
 
-function parseAtuinLine(line: string): AtuinResult | null {
-  const parts = line.split("|");
-  if (parts.length >= 5) {
-    const command = parts.slice(0, -4).join("|");
-    const exit = parts[parts.length - 4];
-    const duration = parts[parts.length - 3];
-    const directory = parts[parts.length - 2];
-    const time = parts[parts.length - 1];
-    return { command, exit, duration, directory, time };
-  }
-  return null;
-}
-
 function formatRelativeTime(timestamp: string): string {
   try {
     const date = new Date(timestamp);
@@ -238,30 +225,18 @@ async function searchAtuin() {
   try {
     console.log("Invoking atuin_search_command...");
     const filters = getFilters();
-    const output: string = await invoke("atuin_search_command", {
+    const results: AtuinResult[] = await invoke("atuin_search_command", {
       query,
       filters,
     });
-    console.log("Got output:", output);
+    console.log("Got results:", results.length);
 
-    if (!output || output.trim() === "") {
-      console.log("Empty output");
+    if (results.length === 0) {
       atuinResultsEl.innerHTML = "";
       resizeWindow(0);
       return;
     }
 
-    const lines = output.split("\n").filter((line) => line.trim() !== "");
-    const results: AtuinResult[] = [];
-
-    for (const line of lines) {
-      const parsed = parseAtuinLine(line);
-      if (parsed) {
-        results.push(parsed);
-      }
-    }
-
-    console.log("Parsed results:", results.length);
     renderResults(results.reverse());
   } catch (error) {
     console.error("Atuin search error:", error);

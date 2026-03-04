@@ -37,6 +37,7 @@ dirs = "5"
 tokio = { version = "1", features = ["macros", "rt"] }
 tauri = { version = "2", features = ["macos-private-api", "test"] }
 serial_test = "3"
+proptest = "1"
 
 [profile.release]
 opt-level = "z"     # Optimize for size

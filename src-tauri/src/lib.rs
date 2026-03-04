@@ -1,6 +1,48 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::LazyLock;
+
+fn log_debug(msg: &str) {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let log_path = format!("{}/atuin-bar-debug.log", home);
+    match fs::OpenOptions::new().create(true).append(true).open(&log_path) {
+        Ok(mut file) => {
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let _ = writeln!(file, "[{}] {}", timestamp, msg);
+            let _ = file.flush();
+        }
+        Err(e) => {
+            eprintln!("log_debug failed to open {}: {}", log_path, e);
+        }
+    }
+}
+
+/// Resolve the full path to the `atuin` binary.
+/// macOS GUI apps don't inherit the user's shell PATH, so we check common locations.
+fn find_atuin_binary() -> String {
+    let candidates = [
+        // Homebrew (Apple Silicon)
+        "/opt/homebrew/bin/atuin",
+        // Homebrew (Intel)
+        "/usr/local/bin/atuin",
+        // Cargo install
+        &format!("{}/.cargo/bin/atuin", std::env::var("HOME").unwrap_or_default()),
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    // Fallback: hope it's on PATH
+    "atuin".to_string()
+}
+
+static ATUIN_BIN: LazyLock<String> = LazyLock::new(find_atuin_binary);
 use tauri::{menu::{MenuBuilder, MenuItemBuilder}, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::ShortcutState;
@@ -167,6 +209,43 @@ window_width = {}
     Ok(config)
 }
 
+/// A single parsed result from atuin search output
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AtuinResult {
+    pub command: String,
+    pub exit: String,
+    pub duration: String,
+    pub directory: String,
+    pub time: String,
+}
+
+/// Parse a single line of atuin output in the format:
+/// `{command}|{exit}|{duration}|{directory}|{time}`
+///
+/// The command field may contain `|` characters, so we split from the right.
+pub fn parse_atuin_line(line: &str) -> Option<AtuinResult> {
+    let parts: Vec<&str> = line.rsplitn(5, '|').collect();
+    if parts.len() == 5 {
+        Some(AtuinResult {
+            command:   parts[4].to_string(),
+            exit:      parts[3].to_string(),
+            duration:  parts[2].to_string(),
+            directory: parts[1].to_string(),
+            time:      parts[0].to_string(),
+        })
+    } else {
+        None
+    }
+}
+
+/// Parse the full raw output from atuin search into a vec of results.
+pub fn parse_atuin_output(raw: &str) -> Vec<AtuinResult> {
+    raw.lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(parse_atuin_line)
+        .collect()
+}
+
 /// Search filters for atuin queries
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct SearchFilters {
@@ -179,11 +258,27 @@ pub struct SearchFilters {
 }
 
 // Public function that can be called from integration tests
-pub fn atuin_search(query: &str, filters: Option<SearchFilters>) -> Result<String, String> {
-    let mut cmd = Command::new("atuin");
-    cmd.arg("search")
+pub fn atuin_search(query: &str, filters: Option<SearchFilters>) -> Result<Vec<AtuinResult>, String> {
+    let home = std::env::var("HOME")
+        .unwrap_or_else(|_| format!("/Users/{}", std::env::var("USER").unwrap_or_default()));
+
+    log_debug(&format!("--- atuin_search called with query: {:?}", query));
+    log_debug(&format!("HOME={}", home));
+    log_debug(&format!("ATUIN_BIN={}", ATUIN_BIN.as_str()));
+    log_debug(&format!("PATH={}", std::env::var("PATH").unwrap_or_default()));
+    log_debug(&format!("atuin binary exists: {}", std::path::Path::new(ATUIN_BIN.as_str()).exists()));
+
+    let mut cmd = Command::new(ATUIN_BIN.as_str());
+    cmd.env("HOME", &home)
+        // atuin requires ATUIN_SESSION even for non-interactive search;
+        // GUI apps don't have a shell session, so provide a dummy value.
+        .env("ATUIN_SESSION", "atuin-bar")
+        .arg("search")
         .arg("--search-mode")
         .arg("prefix")
+        // No real shell session, so search all history regardless of session.
+        .arg("--filter-mode")
+        .arg("global")
         .arg("--limit")
         .arg("50")
         .arg("--format")
@@ -229,20 +324,42 @@ pub fn atuin_search(query: &str, filters: Option<SearchFilters>) -> Result<Strin
 
     let output = cmd
         .output()
-        .map_err(|e| format!("Failed to execute atuin command: {}", e))?;
+        .map_err(|e| {
+            log_debug(&format!("Failed to execute atuin: {}", e));
+            format!("Failed to execute atuin command: {}", e)
+        })?;
+
+    log_debug(&format!("exit status: {}", output.status));
+    log_debug(&format!("stdout len: {}", output.stdout.len()));
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
+    if !stderr_str.is_empty() {
+        log_debug(&format!("stderr: {}", stderr_str));
+    }
 
     if output.status.success() {
-        String::from_utf8(output.stdout).map_err(|e| format!("Failed to parse atuin output: {}", e))
+        let raw = String::from_utf8(output.stdout).map_err(|e| format!("Failed to parse atuin output: {}", e))?;
+        log_debug(&format!("success, output lines: {}", raw.lines().count()));
+        Ok(parse_atuin_output(&raw))
     } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-        Err(format!("atuin command failed: {}", error_message))
+        // atuin exits with code 1 when there are no matching results —
+        // treat this as an empty result set, not an error.
+        let stderr_msg = String::from_utf8_lossy(&output.stderr);
+        if stderr_msg.trim().is_empty() {
+            log_debug("atuin exited non-zero with empty stderr, treating as no results");
+            Ok(vec![])
+        } else {
+            Err(format!("atuin command failed: {}", stderr_msg))
+        }
     }
 }
 
 // Tauri command wrapper (private)
 #[tauri::command]
-fn atuin_search_command(query: &str, filters: Option<SearchFilters>) -> Result<String, String> {
-    atuin_search(query, filters)
+fn atuin_search_command(query: &str, filters: Option<SearchFilters>) -> Result<Vec<AtuinResult>, String> {
+    log_debug(&format!("atuin_search_command invoked with query: {:?}", query));
+    let result = atuin_search(query, filters);
+    log_debug(&format!("atuin_search_command result: {:?}", result.as_ref().map(|v| v.len())));
+    result
 }
 
 #[tauri::command]
@@ -257,9 +374,15 @@ async fn copy_to_clipboard<R: tauri::Runtime>(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    log_debug("=== atuin-bar starting ===");
+    log_debug(&format!("HOME={}", std::env::var("HOME").unwrap_or_else(|_| "NOT SET".into())));
+    log_debug(&format!("USER={}", std::env::var("USER").unwrap_or_else(|_| "NOT SET".into())));
+    log_debug(&format!("ATUIN_BIN={}", ATUIN_BIN.as_str()));
+
     // Load configuration
     let config = load_config();
     let shortcut = config.shortcut;
+    log_debug(&format!("shortcut={}", shortcut));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -268,6 +391,7 @@ pub fn run() {
                 .with_shortcuts([shortcut.as_str()])
                 .unwrap()
                 .with_handler(|app, _shortcut, event| {
+                    log_debug(&format!("shortcut event: {:?}", event.state));
                     if event.state == ShortcutState::Pressed {
                         // Toggle window visibility
                         if let Some(window) = app.get_webview_window("main") {
