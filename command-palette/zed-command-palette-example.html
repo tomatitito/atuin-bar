@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zed-Style Command Palette Example</title>
+  <link rel="stylesheet" href="zed-command-palette-design.css">
+</head>
+<body>
+  <!-- Command Palette Overlay -->
+  <div class="command-palette-overlay" id="commandPaletteOverlay">
+    <!-- Main Command Palette Container -->
+    <div class="command-palette">
+      <!-- Search Input -->
+      <div class="command-palette-header">
+        <input 
+          type="text" 
+          class="command-palette-input" 
+          id="commandInput"
+          placeholder="Search shell history..."
+          autofocus
+        >
+      </div>
+
+      <!-- Results List -->
+      <div class="command-palette-results" id="resultsContainer">
+        <!-- History Section (optional) -->
+        <div class="command-section-divider">Recent</div>
+        
+        <!-- Command Items -->
+        <div class="command-item selected" tabindex="0">
+          <div class="command-item-label">
+            <span class="command-item-text">
+              git commit -m "<mark>fix</mark>: update dependencies"
+            </span>
+          </div>
+          <div class="command-item-keybinding">
+            <span class="keybinding-key">↵</span>
+          </div>
+        </div>
+
+        <div class="command-item" tabindex="0">
+          <div class="command-item-label">
+            <span class="command-item-text">
+              npm run dev
+            </span>
+          </div>
+          <div class="command-item-keybinding">
+            <span class="keybinding-key">2</span>
+          </div>
+        </div>
+
+        <div class="command-item" tabindex="0">
+          <div class="command-item-label">
+            <span class="command-item-text">
+              cargo <mark>fix</mark> --allow-dirty
+            </span>
+          </div>
+          <div class="command-item-keybinding">
+            <span class="keybinding-key">3</span>
+          </div>
+        </div>
+
+        <!-- Divider for search results -->
+        <div class="command-section-divider">All Commands</div>
+
+        <div class="command-item" tabindex="0">
+          <div class="command-item-label">
+            <span class="command-item-text">
+              docker ps -a
+            </span>
+          </div>
+        </div>
+
+        <div class="command-item" tabindex="0">
+          <div class="command-item-label">
+            <span class="command-item-text">
+              kubectl get pods --all-namespaces
+            </span>
+          </div>
+        </div>
+
+        <!-- More items... -->
+      </div>
+
+      <!-- Optional Footer with Actions -->
+      <div class="command-palette-footer">
+        <button class="footer-button">
+          Copy <span style="opacity: 0.6; margin-left: 4px;">⌘C</span>
+        </button>
+        <button class="footer-button primary">
+          Run <span style="opacity: 0.8; margin-left: 4px;">↵</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Example JavaScript for Interaction -->
+  <script>
+    // Basic interaction example
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('commandInput');
+      const resultsContainer = document.getElementById('resultsContainer');
+      const overlay = document.getElementById('commandPaletteOverlay');
+      
+      // Sample data - replace with your Atuin integration
+      const commands = [
+        'git commit -m "fix: update dependencies"',
+        'npm run dev',
+        'cargo fix --allow-dirty',
+        'docker ps -a',
+        'kubectl get pods --all-namespaces',
+        'git push origin main',
+        'npm install',
+        'cargo build --release',
+        'docker-compose up -d',
+        'ssh user@server.com'
+      ];
+
+      let selectedIndex = 0;
+      const items = resultsContainer.querySelectorAll('.command-item');
+
+      // Handle keyboard navigation
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectItem(selectedIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectItem(selectedIndex - 1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          // Execute selected command
+          const selectedItem = items[selectedIndex];
+          if (selectedItem) {
+            const command = selectedItem.querySelector('.command-item-text').textContent.trim();
+            console.log('Execute:', command);
+            // Your Tauri invoke here to execute command
+          }
+        } else if (e.key === 'Escape') {
+          // Close palette
+          overlay.style.display = 'none';
+        }
+      });
+
+      // Handle search/filter
+      input.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        // Filter and highlight matches
+        filterCommands(query);
+      });
+
+      // Handle item clicks
+      items.forEach((item, index) => {
+        item.addEventListener('click', () => {
+          selectItem(index);
+          // Execute command
+          const command = item.querySelector('.command-item-text').textContent.trim();
+          console.log('Execute:', command);
+        });
+      });
+
+      // Selection helper
+      function selectItem(index) {
+        if (index < 0) index = items.length - 1;
+        if (index >= items.length) index = 0;
+        
+        items[selectedIndex]?.classList.remove('selected');
+        items[index]?.classList.add('selected');
+        selectedIndex = index;
+        
+        // Scroll into view if needed
+        items[index]?.scrollIntoView({ block: 'nearest' });
+      }
+
+      // Filter helper (simplified)
+      function filterCommands(query) {
+        items.forEach(item => {
+          const text = item.querySelector('.command-item-text').textContent.toLowerCase();
+          if (text.includes(query)) {
+            item.style.display = 'flex';
+            // Highlight matching text (simplified)
+            highlightMatch(item, query);
+          } else {
+            item.style.display = 'none';
+          }
+        });
+      }
+
+      function highlightMatch(item, query) {
+        const textEl = item.querySelector('.command-item-text');
+        const text = textEl.textContent;
+        if (!query) {
+          textEl.innerHTML = text;
+          return;
+        }
+        
+        // Simple highlight (you may want more sophisticated matching)
+        const regex = new RegExp(`(${query})`, 'gi');
+        textEl.innerHTML = text.replace(regex, '<mark>$1</mark>');
+      }
+
+      // Click outside to close
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.style.display = 'none';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

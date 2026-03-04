@@ -1,0 +1,364 @@
+/* Zed Command Palette Recreation for Tauri App */
+/* Based on analysis of Zed editor's command palette design */
+
+/* CSS Variables for Theming */
+:root {
+  /* Light Theme Colors */
+  --background: #ffffff;
+  --elevated-surface: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-variant: rgba(0, 0, 0, 0.04);
+  --text: #1c1c1c;
+  --text-muted: #6b6b6b;
+  --text-accent: #0066cc;
+  --ghost-hover: rgba(0, 0, 0, 0.04);
+  --ghost-active: rgba(0, 0, 0, 0.08);
+  --ghost-selected: rgba(0, 123, 255, 0.12);
+  --keybinding-bg: rgba(0, 0, 0, 0.06);
+  --keybinding-text: #4a4a4a;
+  
+  /* Shadows for elevation-3 (modal surface) */
+  --shadow-1: 0px 0px 1px rgba(0, 0, 0, 0.12);
+  --shadow-2: 0px 2px 3px rgba(0, 0, 0, 0.06);
+  --shadow-3: 0px 3px 8px rgba(0, 0, 0, 0.04);
+  
+  /* Dimensions (using rem units - 1rem = 16px by default) */
+  --palette-width: 34rem; /* 544px */
+  --palette-max-height: 24rem; /* 384px */
+  --border-radius: 8px;
+  --item-height: 2rem; /* 32px */
+  --input-height: 2.25rem; /* 36px */
+}
+
+/* Dark Theme Colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1e1e1e;
+    --elevated-surface: #2a2a2a;
+    --border: rgba(255, 255, 255, 0.12);
+    --border-variant: rgba(255, 255, 255, 0.06);
+    --text: #e4e4e4;
+    --text-muted: #9a9a9a;
+    --text-accent: #4db8ff;
+    --ghost-hover: rgba(255, 255, 255, 0.06);
+    --ghost-active: rgba(255, 255, 255, 0.10);
+    --ghost-selected: rgba(77, 184, 255, 0.20);
+    --keybinding-bg: rgba(255, 255, 255, 0.08);
+    --keybinding-text: #b8b8b8;
+    
+    /* Dark theme shadows */
+    --shadow-1: 0px 0px 1px rgba(0, 0, 0, 0.24);
+    --shadow-2: 0px 2px 3px rgba(0, 0, 0, 0.12);
+    --shadow-3: 0px 3px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Base Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Overlay Container */
+.command-palette-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+  z-index: 9999;
+  animation: fadeIn 150ms ease-out;
+}
+
+/* Main Command Palette Container */
+.command-palette {
+  width: var(--palette-width);
+  max-width: 90vw;
+  background: var(--elevated-surface);
+  border: 1px solid var(--border-variant);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-1), var(--shadow-2), var(--shadow-3);
+  overflow: hidden;
+  animation: slideDown 200ms ease-out;
+}
+
+/* Search Input Container */
+.command-palette-header {
+  border-bottom: 1px solid var(--border-variant);
+  background: var(--elevated-surface);
+}
+
+.command-palette-input {
+  width: 100%;
+  height: var(--input-height);
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.command-palette-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Results Container */
+.command-palette-results {
+  max-height: var(--palette-max-height);
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* Custom Scrollbar */
+.command-palette-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.command-palette-results::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.command-palette-results::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.command-palette-results::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* List Items */
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--item-height);
+  padding: 0 12px;
+  margin: 0 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 100ms ease-out;
+  position: relative;
+}
+
+.command-item:hover {
+  background: var(--ghost-hover);
+}
+
+.command-item.selected {
+  background: var(--ghost-selected);
+}
+
+.command-item:active {
+  background: var(--ghost-active);
+}
+
+/* Command Text */
+.command-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.command-item-text {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Highlighted search matches */
+.command-item-text mark {
+  background: transparent;
+  color: var(--text-accent);
+  font-weight: 500;
+}
+
+/* Command Icon (optional) */
+.command-item-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Keybinding Display */
+.command-item-keybinding {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.keybinding-key {
+  padding: 2px 6px;
+  background: var(--keybinding-bg);
+  color: var(--keybinding-text);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Footer Actions (optional) */
+.command-palette-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-variant);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.footer-button {
+  padding: 4px 12px;
+  background: var(--ghost-hover);
+  border: 1px solid var(--border-variant);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 100ms ease-out;
+}
+
+.footer-button:hover {
+  background: var(--ghost-active);
+}
+
+.footer-button.primary {
+  background: var(--text-accent);
+  color: white;
+  border-color: var(--text-accent);
+}
+
+.footer-button.primary:hover {
+  opacity: 0.9;
+}
+
+/* Empty State */
+.command-palette-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* History Section Divider */
+.command-section-divider {
+  padding: 4px 12px;
+  margin: 4px 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-variant);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Loading State */
+.command-palette-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--text-muted);
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-variant);
+  border-top-color: var(--text-accent);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .command-palette {
+    max-width: 95vw;
+  }
+  
+  .command-palette-results {
+    max-height: 60vh;
+  }
+}
+
+/* Focus Visible for Accessibility */
+.command-item:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: -2px;
+}
+
+.command-palette-input:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: -2px;
+}
+
+/* Utility Classes */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
