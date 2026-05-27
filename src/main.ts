@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalSize } from "@tauri-apps/api/dpi";
+import type { AtuinResult, ExitFilter, SearchFilters, TimeRange } from "./bindings";
 
 function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -13,11 +14,11 @@ let filterPanelEl: HTMLElement | null;
 let filterDirectoryEl: HTMLInputElement | null;
 let filterExitEl: HTMLSelectElement | null;
 let filterTimeEl: HTMLSelectElement | null;
-let commandPopupEl: HTMLElement | null;
 let selectedIndex = -1;
 let currentResults: AtuinResult[] = [];
 let filtersVisible = false;
-let popupVisible = false;
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let searchGeneration = 0;
 
 const BASE_HEIGHT = 38;
 const FILTER_PANEL_HEIGHT = 56;
@@ -26,20 +27,6 @@ const CONTAINER_PADDING = 8;
 
 let maxVisibleResults = 20;
 let windowWidth = 700;
-
-interface SearchFilters {
-  directory?: string;
-  exit_filter?: string;
-  time_range?: string;
-}
-
-interface AtuinResult {
-  command: string;
-  exit: string;
-  duration: string;
-  directory: string;
-  time: string;
-}
 
 function formatRelativeTime(timestamp: string): string {
   try {
@@ -65,19 +52,23 @@ function formatRelativeTime(timestamp: string): string {
 }
 
 function getFilters(): SearchFilters | undefined {
-  const filters: SearchFilters = {};
+  const filters: SearchFilters = {
+    directory: null,
+    exit_filter: null,
+    time_range: null,
+  };
 
   if (filterDirectoryEl?.value) {
     filters.directory = filterDirectoryEl.value;
   }
   if (filterExitEl?.value) {
-    filters.exit_filter = filterExitEl.value;
+    filters.exit_filter = filterExitEl.value as ExitFilter;
   }
   if (filterTimeEl?.value) {
-    filters.time_range = filterTimeEl.value;
+    filters.time_range = filterTimeEl.value as TimeRange;
   }
 
-  return Object.keys(filters).length > 0 ? filters : undefined;
+  return hasActiveFilters() ? filters : undefined;
 }
 
 function hasActiveFilters(): boolean {
@@ -113,55 +104,30 @@ function updateSelection() {
   });
 }
 
-function showPopup(result: AtuinResult, rowEl: Element) {
-  if (!commandPopupEl) return;
-
-  const popupCommand = commandPopupEl.querySelector(".popup-command");
-  const popupMeta = commandPopupEl.querySelector(".popup-meta");
-
-  if (popupCommand) {
-    popupCommand.textContent = result.command;
+async function clearResults() {
+  if (atuinResultsEl) {
+    atuinResultsEl.innerHTML = "";
   }
-
-  if (popupMeta) {
-    const exitClass = result.exit === "0" ? "exit-success" : "exit-failure";
-    const folderIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3H13.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2.5a2 2 0 0 1-2-2V3.87z"/></svg>`;
-    const clockIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>`;
-    popupMeta.innerHTML = `
-      <span class="popup-meta-item">${folderIcon} ${result.directory}</span>
-      <span class="popup-meta-item">${clockIcon} ${result.time}</span>
-      <span class="popup-meta-item ${exitClass}">Exit: ${result.exit}</span>
-    `;
-  }
-
-  const rowRect = rowEl.getBoundingClientRect();
-  commandPopupEl.style.top = `${rowRect.bottom + 4}px`;
-  commandPopupEl.classList.remove("hidden");
-  popupVisible = true;
-
-  resizeWindowForPopup();
+  currentResults = [];
+  selectedIndex = -1;
+  await resizeWindow(0);
 }
 
-function hidePopup() {
-  if (!commandPopupEl || !popupVisible) return;
-  commandPopupEl.classList.add("hidden");
-  popupVisible = false;
-  resizeWindow(currentResults.length);
+function clearPendingSearch() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
+  }
 }
 
-async function resizeWindowForPopup() {
-  if (!isTauri() || !commandPopupEl) return;
+function invalidateSearch(): number {
+  searchGeneration += 1;
+  clearPendingSearch();
+  return searchGeneration;
+}
 
-  try {
-    const window = getCurrentWebviewWindow();
-    const popupRect = commandPopupEl.getBoundingClientRect();
-    const newHeight = popupRect.bottom + 12;
-    await window.setSize(
-      new LogicalSize(windowWidth, Math.max(newHeight, 200)),
-    );
-  } catch (error) {
-    console.error("Failed to resize window for popup:", error);
-  }
+function isCurrentSearch(generation: number): boolean {
+  return generation === searchGeneration;
 }
 
 function renderResults(results: AtuinResult[]) {
@@ -192,28 +158,20 @@ function renderResults(results: AtuinResult[]) {
     row.appendChild(commandEl);
     row.appendChild(metaEl);
 
-    row.addEventListener("mouseenter", () => {
-      showPopup(result, row);
-    });
-    row.addEventListener("mouseleave", () => {
-      hidePopup();
-    });
-
     resultsContainer.appendChild(row);
   });
 
   resizeWindow(results.length);
 }
 
-async function searchAtuin() {
+async function searchAtuin(generation = invalidateSearch()) {
   if (!atuinInputEl || !atuinResultsEl) return;
 
   const query = atuinInputEl.value.trim();
   console.log("searchAtuin called with query:", query);
 
   if (!query) {
-    atuinResultsEl.innerHTML = "";
-    resizeWindow(0);
+    await clearResults();
     return;
   }
 
@@ -229,29 +187,38 @@ async function searchAtuin() {
       query,
       filters,
     });
+
+    if (!isCurrentSearch(generation)) {
+      return;
+    }
+
     console.log("Got results:", results.length);
 
     if (results.length === 0) {
-      atuinResultsEl.innerHTML = "";
-      resizeWindow(0);
+      await clearResults();
       return;
     }
 
     renderResults(results.reverse());
   } catch (error) {
     console.error("Atuin search error:", error);
-    atuinResultsEl.innerHTML = "";
-    resizeWindow(0);
+    if (isCurrentSearch(generation)) {
+      await clearResults();
+    }
   }
 }
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-
 function debounceSearch() {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
+  const generation = invalidateSearch();
+  if (!atuinInputEl?.value.trim()) {
+    void clearResults();
+    return;
   }
-  searchTimeout = setTimeout(searchAtuin, 150);
+
+  searchTimeout = setTimeout(() => {
+    searchTimeout = null;
+    void searchAtuin(generation);
+  }, 150);
 }
 
 function toggleFilters() {
@@ -304,8 +271,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   filterDirectoryEl = document.querySelector("#filter-directory");
   filterExitEl = document.querySelector("#filter-exit");
   filterTimeEl = document.querySelector("#filter-time");
-  commandPopupEl = document.querySelector("#command-popup");
-
   await loadConfig();
 
   if (atuinInputEl) {
@@ -330,7 +295,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   document.querySelector("#atuin-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    searchAtuin();
+    void searchAtuin();
   });
 
   document.addEventListener("keydown", async (e) => {
@@ -338,24 +303,17 @@ window.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       e.stopPropagation();
 
-      if (popupVisible) {
-        hidePopup();
-        return;
-      }
-
       try {
         const window = getCurrentWebviewWindow();
+        invalidateSearch();
         if (atuinInputEl) atuinInputEl.value = "";
-        if (atuinResultsEl) atuinResultsEl.innerHTML = "";
         if (filterDirectoryEl) filterDirectoryEl.value = "";
         if (filterExitEl) filterExitEl.value = "";
         if (filterTimeEl) filterTimeEl.value = "";
         if (filterPanelEl) filterPanelEl.classList.add("hidden");
         filtersVisible = false;
         updateFilterToggleState();
-        currentResults = [];
-        selectedIndex = -1;
-        await resizeWindow(0);
+        await clearResults();
         await window.hide();
       } catch (error) {
         console.error("Failed to hide window:", error);
@@ -366,29 +324,12 @@ window.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
       updateSelection();
-      hidePopup();
     }
 
     if (e.key === "ArrowUp" && currentResults.length > 0) {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
       updateSelection();
-      hidePopup();
-    }
-
-    if (
-      e.key === "h" &&
-      selectedIndex >= 0 &&
-      selectedIndex < currentResults.length
-    ) {
-      e.preventDefault();
-      const selectedRow =
-        atuinResultsEl?.querySelectorAll(".result-row")[selectedIndex];
-      if (selectedRow && !popupVisible) {
-        showPopup(currentResults[selectedIndex], selectedRow);
-      } else {
-        hidePopup();
-      }
     }
 
     if (
@@ -401,11 +342,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       try {
         await invoke("copy_to_clipboard", { text: selected.command });
         const window = getCurrentWebviewWindow();
+        invalidateSearch();
         if (atuinInputEl) atuinInputEl.value = "";
-        if (atuinResultsEl) atuinResultsEl.innerHTML = "";
-        currentResults = [];
-        selectedIndex = -1;
-        await resizeWindow(0);
+        await clearResults();
         await window.hide();
       } catch (error) {
         console.error("Failed to copy to clipboard:", error);
@@ -413,5 +352,5 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  resizeWindow(0);
+  void clearResults();
 });
