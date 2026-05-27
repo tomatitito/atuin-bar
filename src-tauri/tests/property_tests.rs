@@ -81,7 +81,7 @@ proptest! {
         let atuin_bin = find_atuin_binary();
         let mut cmd = Command::new(&atuin_bin);
         cmd.env("ATUIN_SESSION", "atuin-bar");
-        cmd.args(["search", "--search-mode", "prefix", "--filter-mode", "global", "--limit", "50"]);
+        cmd.args(["search", "--search-mode", "fuzzy", "--filter-mode", "global", "--limit", "50"]);
         cmd.args(["--format", "{command}"]);
 
         if let Some(ref ef) = exit_filter {
