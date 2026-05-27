@@ -1,4 +1,4 @@
-use atuin_bar_lib::{atuin_search, SearchFilters};
+use atuin_bar_lib::{atuin_search, ExitFilter, SearchFilters, TimeRange};
 use serial_test::serial;
 
 #[test]
@@ -20,8 +20,7 @@ fn test_atuin_search_e2e() {
         Err(e) => {
             println!("Atuin search failed (OK if atuin is not installed): {}", e);
             assert!(
-                e.contains("Failed to execute atuin command") ||
-                e.contains("atuin command failed"),
+                e.contains("Failed to execute atuin command") || e.contains("atuin command failed"),
                 "Error should be a known atuin error type, got: {}",
                 e
             );
@@ -37,8 +36,7 @@ fn test_atuin_search_empty_query() {
         Ok(_) => {}
         Err(e) => {
             assert!(
-                e.contains("Failed to execute atuin command") ||
-                e.contains("atuin command failed"),
+                e.contains("Failed to execute atuin command") || e.contains("atuin command failed"),
                 "Error should be a known atuin error type, got: {}",
                 e
             );
@@ -48,11 +46,7 @@ fn test_atuin_search_empty_query() {
 
 #[test]
 fn test_atuin_search_special_characters() {
-    let queries = vec![
-        "git commit",
-        "cd ..",
-        "echo 'hello world'",
-    ];
+    let queries = vec!["git commit", "cd ..", "echo 'hello world'"];
 
     for query in queries {
         let result = atuin_search(query, None);
@@ -61,8 +55,8 @@ fn test_atuin_search_special_characters() {
             Ok(_) => {}
             Err(e) => {
                 assert!(
-                    e.contains("Failed to execute atuin command") ||
-                    e.contains("atuin command failed"),
+                    e.contains("Failed to execute atuin command")
+                        || e.contains("atuin command failed"),
                     "Error should be a known atuin error type, got: {}",
                     e
                 );
@@ -96,8 +90,8 @@ fn test_atuin_search_output_format() {
 fn test_atuin_search_with_filters() {
     let filters = SearchFilters {
         directory: Some("/tmp".to_string()),
-        exit_filter: Some("success".to_string()),
-        time_range: Some("7d".to_string()),
+        exit_filter: Some(ExitFilter::Success),
+        time_range: Some(TimeRange::SevenDays),
     };
 
     let result = atuin_search("", Some(filters));
@@ -106,8 +100,7 @@ fn test_atuin_search_with_filters() {
         Ok(_) => {}
         Err(e) => {
             assert!(
-                e.contains("Failed to execute atuin command") ||
-                e.contains("atuin command failed"),
+                e.contains("Failed to execute atuin command") || e.contains("atuin command failed"),
                 "Error should be a known atuin error type, got: {}",
                 e
             );
@@ -119,7 +112,7 @@ fn test_atuin_search_with_filters() {
 fn test_atuin_search_exit_filter_failure() {
     let filters = SearchFilters {
         directory: None,
-        exit_filter: Some("failure".to_string()),
+        exit_filter: Some(ExitFilter::Failure),
         time_range: None,
     };
 

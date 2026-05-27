@@ -1,12 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-
-interface Config {
-  shortcut: string;
-  theme: string;
-  max_results: number;
-  window_width: number;
-}
+import type { Config } from "./bindings";
 
 let shortcutInput: HTMLInputElement | null;
 let themeSelect: HTMLSelectElement | null;

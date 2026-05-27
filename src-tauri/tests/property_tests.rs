@@ -1,4 +1,4 @@
-use atuin_bar_lib::{atuin_search, parse_atuin_line, SearchFilters};
+use atuin_bar_lib::{atuin_search, parse_atuin_line, ExitFilter, SearchFilters, TimeRange};
 use proptest::prelude::*;
 use std::process::Command;
 
@@ -34,14 +34,14 @@ proptest! {
 
 /// Resolve the full path to the `atuin` binary (same logic as lib.rs).
 fn find_atuin_binary() -> String {
-    let candidates = [
-        "/opt/homebrew/bin/atuin",
-        "/usr/local/bin/atuin",
-    ];
+    let candidates = ["/opt/homebrew/bin/atuin", "/usr/local/bin/atuin"];
     let home = std::env::var("HOME").unwrap_or_default();
     let cargo_candidate = format!("{}/.cargo/bin/atuin", home);
 
-    for path in candidates.iter().chain(std::iter::once(&cargo_candidate.as_str())) {
+    for path in candidates
+        .iter()
+        .chain(std::iter::once(&cargo_candidate.as_str()))
+    {
         if std::path::Path::new(path).exists() {
             return path.to_string();
         }
@@ -60,8 +60,18 @@ proptest! {
     ) {
         let filters = SearchFilters {
             directory: None,
-            exit_filter: exit_filter.clone(),
-            time_range: time_range.clone(),
+            exit_filter: exit_filter.as_deref().map(|ef| match ef {
+                "success" => ExitFilter::Success,
+                "failure" => ExitFilter::Failure,
+                _ => unreachable!(),
+            }),
+            time_range: time_range.as_deref().map(|tr| match tr {
+                "1h" => TimeRange::OneHour,
+                "24h" => TimeRange::TwentyFourHours,
+                "7d" => TimeRange::SevenDays,
+                "30d" => TimeRange::ThirtyDays,
+                _ => unreachable!(),
+            }),
         };
 
         // Get results through atuin-bar's pipeline (format + parse)
