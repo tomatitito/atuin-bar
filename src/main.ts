@@ -14,6 +14,8 @@ let filterPanelEl: HTMLElement | null;
 let filterDirectoryEl: HTMLInputElement | null;
 let filterExitEl: HTMLSelectElement | null;
 let filterTimeEl: HTMLSelectElement | null;
+let commandPopupEl: HTMLElement | null;
+let commandPopupCommandEl: HTMLElement | null;
 let selectedIndex = -1;
 let currentResults: AtuinResult[] = [];
 let filtersVisible = false;
@@ -24,9 +26,11 @@ const BASE_HEIGHT = 38;
 const FILTER_PANEL_HEIGHT = 56;
 const RESULT_HEIGHT = 32;
 const CONTAINER_PADDING = 8;
+const COMMAND_POPUP_EXTRA_WIDTH = 160;
 
 let maxVisibleResults = 20;
 let windowWidth = 700;
+let commandPopupVisible = false;
 
 function formatRelativeTime(timestamp: string): string {
   try {
@@ -87,21 +91,52 @@ async function resizeWindow(resultCount: number) {
     visibleCount > 0 ? visibleCount * RESULT_HEIGHT + CONTAINER_PADDING : 0;
   const filterHeight = filtersVisible ? FILTER_PANEL_HEIGHT : 0;
   const newHeight = BASE_HEIGHT + filterHeight + resultsHeight;
+  const newWidth = commandPopupVisible
+    ? windowWidth + COMMAND_POPUP_EXTRA_WIDTH
+    : windowWidth;
 
   try {
     const window = getCurrentWebviewWindow();
-    await window.setSize(new LogicalSize(windowWidth, newHeight));
+    await window.setSize(new LogicalSize(newWidth, newHeight));
   } catch (error) {
     console.error("Failed to resize window:", error);
   }
 }
 
-function updateSelection() {
+function updateCommandPopup(showPopup: boolean) {
+  if (!commandPopupEl || !commandPopupCommandEl || !atuinResultsEl) return;
+
+  const selected = currentResults[selectedIndex];
+  const selectedRow = atuinResultsEl.querySelectorAll(".result-row")[
+    selectedIndex
+  ] as HTMLElement | undefined;
+  commandPopupVisible = showPopup && !!selected && !!selectedRow;
+  commandPopupEl.classList.toggle("hidden", !commandPopupVisible);
+
+  if (!commandPopupVisible || !selected || !selectedRow) {
+    commandPopupCommandEl.textContent = "";
+    return;
+  }
+
+  commandPopupCommandEl.textContent = selected.command;
+  const rowRect = selectedRow.getBoundingClientRect();
+  commandPopupEl.style.top = `${rowRect.top}px`;
+  commandPopupEl.style.left = "0px";
+}
+
+function updateSelection(showPopup = commandPopupVisible) {
   if (!atuinResultsEl) return;
   const rows = atuinResultsEl.querySelectorAll(".result-row");
   rows.forEach((row, index) => {
-    row.classList.toggle("selected", index === selectedIndex);
+    const isSelected = index === selectedIndex;
+    row.classList.toggle("selected", isSelected && !showPopup);
+    row.classList.toggle("preview-source", isSelected && showPopup);
+    if (isSelected) {
+      row.scrollIntoView({ block: "nearest" });
+    }
   });
+  updateCommandPopup(showPopup);
+  void resizeWindow(currentResults.length);
 }
 
 async function clearResults() {
@@ -110,6 +145,7 @@ async function clearResults() {
   }
   currentResults = [];
   selectedIndex = -1;
+  updateCommandPopup(false);
   await resizeWindow(0);
 }
 
@@ -137,6 +173,7 @@ function renderResults(results: AtuinResult[]) {
   resultsContainer.innerHTML = "";
   currentResults = results;
   selectedIndex = results.length > 0 ? 0 : -1;
+  updateCommandPopup(false);
 
   if (results.length === 0) return;
 
@@ -210,6 +247,8 @@ async function searchAtuin(generation = invalidateSearch()) {
 
 function debounceSearch() {
   const generation = invalidateSearch();
+  updateCommandPopup(false);
+  void resizeWindow(currentResults.length);
   if (!atuinInputEl?.value.trim()) {
     void clearResults();
     return;
@@ -255,6 +294,15 @@ async function loadConfig() {
     const configWindowWidth: number = await invoke("get_window_width");
     windowWidth = configWindowWidth;
 
+    document.documentElement.style.setProperty(
+      "--atuin-window-width",
+      `${windowWidth}px`,
+    );
+    document.documentElement.style.setProperty(
+      "--command-popup-width",
+      `${windowWidth + COMMAND_POPUP_EXTRA_WIDTH}px`,
+    );
+
     if (atuinResultsEl) {
       atuinResultsEl.style.maxHeight = `${maxVisibleResults * RESULT_HEIGHT}px`;
     }
@@ -271,6 +319,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   filterDirectoryEl = document.querySelector("#filter-directory");
   filterExitEl = document.querySelector("#filter-exit");
   filterTimeEl = document.querySelector("#filter-time");
+  commandPopupEl = document.querySelector("#command-popup");
+  commandPopupCommandEl = document.querySelector("#command-popup-command");
   await loadConfig();
 
   if (atuinInputEl) {
@@ -323,13 +373,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "ArrowDown" && currentResults.length > 0) {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
-      updateSelection();
+      updateSelection(true);
     }
 
     if (e.key === "ArrowUp" && currentResults.length > 0) {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
-      updateSelection();
+      updateSelection(true);
     }
 
     if (
