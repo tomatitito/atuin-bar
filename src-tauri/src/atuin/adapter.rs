@@ -1,3 +1,4 @@
+use super::daemon::AtuinDaemonAdapter;
 use super::filters::{SearchFilters, ValidatedSearchFilters};
 use super::parser::{parse_atuin_output, AtuinResult};
 use crate::logging::log_debug;
@@ -138,5 +139,13 @@ pub fn atuin_search(
         filters,
         limit: 50,
     };
-    AtuinCliAdapter.search(request)
+    match AtuinDaemonAdapter.search(request.clone()) {
+        Ok(results) => Ok(results),
+        Err(err) => {
+            log_debug(&format!(
+                "atuin daemon search unavailable, falling back to CLI: {err}"
+            ));
+            AtuinCliAdapter.search(request)
+        }
+    }
 }
