@@ -1,6 +1,6 @@
 ---
 id: ab-ggu
-status: open
+status: closed
 deps: [ab-dq7]
 links: []
 created: 2026-01-17T00:19:11.548095+01:00

@@ -1,6 +1,6 @@
 ---
 id: ab-2kw
-status: open
+status: closed
 deps: [ab-j58]
 links: []
 created: 2026-01-17T00:18:43.533846+01:00

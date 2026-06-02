@@ -4,11 +4,13 @@
   "version": "0.1.0",
   "description": "Spotlight-like overlay interface for atuin shell history search",
   "type": "module",
+  "packageManager": "pnpm@11.5.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "set-version": "node scripts/set-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

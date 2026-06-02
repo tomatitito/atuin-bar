@@ -82,16 +82,29 @@ The release profile is optimized for small binary size:
 
 **Development:**
 ```bash
-npm install
-npm run tauri dev
+pnpm install
+pnpm tauri dev
 ```
 
 **Release:**
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 The release build will create optimized binaries in `src-tauri/target/release/bundle/`.
+
+### GitHub Releases
+
+Use the version script to keep `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json` in sync:
+
+```bash
+pnpm set-version patch   # or minor, major, 1.2.3, v1.2.3
+git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+git commit -m "Bump version to 1.2.3"
+git push origin main
+```
+
+When CI sees a new version on `main`, it creates the matching `v1.2.3` tag, builds a universal macOS `.app` bundle, packages it as `atuin-bar-v1.2.3-macos-universal.zip`, and creates a GitHub Release with auto-generated release notes. Pushing a `vX.Y.Z` tag manually also triggers the release workflow.
 
 ### Platform Support
 
@@ -107,7 +120,7 @@ The app uses `macos-private-api` feature for better overlay window behavior on m
 ### Prerequisites
 
 - Rust (via rustup)
-- Node.js & npm
+- Node.js & pnpm
 - On Linux: GTK3 development libraries (libgtk-3-dev, libwebkit2gtk-4.0-dev)
 
 ### Recommended IDE Setup

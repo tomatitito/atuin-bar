@@ -1,6 +1,6 @@
 ---
 id: ab-fkq
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-01-17T00:18:59.961977+01:00

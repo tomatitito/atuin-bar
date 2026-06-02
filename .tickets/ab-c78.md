@@ -1,6 +1,6 @@
 ---
 id: ab-c78
-status: hooked
+status: closed
 deps: [ab-j58]
 links: []
 created: 2026-01-17T00:18:31.579176+01:00
