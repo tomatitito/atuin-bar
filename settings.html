@@ -89,16 +89,19 @@
         transition: background 0.2s;
       }
 
-      .save-button {
+      .save-button,
+      .update-button {
         background: #0066cc;
         color: white;
       }
 
-      .save-button:hover {
+      .save-button:hover,
+      .update-button:hover {
         background: #0052a3;
       }
 
-      .save-button:disabled {
+      .save-button:disabled,
+      .update-button:disabled {
         background: #444;
         color: #999;
         cursor: not-allowed;
@@ -168,6 +171,12 @@
         <label for="window_width">Window Width</label>
         <div class="description">Width of the search window in pixels</div>
         <input type="number" id="window_width" min="400" max="2000" />
+      </div>
+
+      <div class="setting-group">
+        <label>Updates</label>
+        <div class="description">Check GitHub releases and install a newer macOS app bundle when available.</div>
+        <button class="update-button" id="update-button">Check for Updates</button>
       </div>
 
       <div class="button-group">

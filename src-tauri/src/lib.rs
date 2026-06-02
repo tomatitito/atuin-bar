@@ -4,6 +4,7 @@ mod clipboard;
 pub mod commands;
 pub mod config;
 pub mod logging;
+mod updater;
 
 pub use app::run;
 pub use atuin::{

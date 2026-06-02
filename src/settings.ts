@@ -8,7 +8,16 @@ let maxResultsInput: HTMLInputElement | null;
 let windowWidthInput: HTMLInputElement | null;
 let saveButton: HTMLButtonElement | null;
 let cancelButton: HTMLButtonElement | null;
+let updateButton: HTMLButtonElement | null;
 let messageDiv: HTMLElement | null;
+
+type SelfUpdateResult = {
+  updated: boolean;
+  current_version: string;
+  latest_version: string;
+  message: string;
+  release_url: string;
+};
 
 async function loadConfig() {
   try {
@@ -88,6 +97,21 @@ async function saveConfig() {
   }
 }
 
+async function selfUpdate() {
+  if (updateButton) updateButton.disabled = true;
+  showMessage("Checking GitHub releases...", "success");
+
+  try {
+    const result: SelfUpdateResult = await invoke("self_update");
+    showMessage(result.message, "success");
+    if (!result.updated && updateButton) updateButton.disabled = false;
+  } catch (error) {
+    console.error("Failed to update:", error);
+    showMessage(`Failed to update: ${error}`, "error");
+    if (updateButton) updateButton.disabled = false;
+  }
+}
+
 function cancelSettings() {
   const window = getCurrentWebviewWindow();
   window.close();
@@ -100,12 +124,14 @@ window.addEventListener("DOMContentLoaded", async () => {
   windowWidthInput = document.querySelector("#window_width");
   saveButton = document.querySelector("#save-button");
   cancelButton = document.querySelector("#cancel-button");
+  updateButton = document.querySelector("#update-button");
   messageDiv = document.querySelector("#message");
 
   await loadConfig();
 
   saveButton?.addEventListener("click", saveConfig);
   cancelButton?.addEventListener("click", cancelSettings);
+  updateButton?.addEventListener("click", selfUpdate);
 
   // Handle Enter key to save
   document.addEventListener("keydown", (e) => {

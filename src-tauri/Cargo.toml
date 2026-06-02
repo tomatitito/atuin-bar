@@ -5,7 +5,7 @@ description = "Spotlight-like overlay interface for atuin shell history search"
 authors = []
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/atuin-bar"
+repository = "https://github.com/tomatitito/atuin-bar"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -38,6 +38,8 @@ atuin-daemon = "18.16.1"
 time = { version = "0.3", features = ["formatting", "local-offset"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 uuid = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+semver = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

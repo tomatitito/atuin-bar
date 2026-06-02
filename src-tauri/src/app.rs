@@ -55,7 +55,8 @@ pub fn run() {
             crate::commands::get_max_results,
             crate::commands::get_window_width,
             crate::commands::get_config,
-            crate::commands::update_config
+            crate::commands::update_config,
+            crate::updater::self_update
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -89,7 +90,7 @@ pub fn run() {
                             WebviewUrl::App("settings.html".into()),
                         )
                         .title("Atuin Bar Settings")
-                        .inner_size(500.0, 400.0)
+                        .inner_size(500.0, 500.0)
                         .resizable(false)
                         .center()
                         .build();

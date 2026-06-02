@@ -30,8 +30,21 @@ Click on the **Atuin-Bar** menu and select **Settings** to open a graphical conf
 - Toggle between dark and light themes
 - Adjust the maximum number of search results displayed
 - Customize the window width
+- Check GitHub for updates and install a newer release
 
 Changes to theme, max results, and window width take effect immediately. Shortcut changes require an app restart.
+
+### Self-Update
+
+To update atuin-bar from the app:
+
+1. Open the **Atuin-Bar** menu and select **Settings**.
+2. In the **Updates** section, click **Check for Updates**.
+3. If a newer GitHub Release is available, atuin-bar downloads the macOS release archive, installs it over the current `.app` bundle, quits, and reopens automatically.
+
+If you are already running the latest version, the settings window shows an “already up to date” message.
+
+**Note:** Self-update currently works only when running the packaged macOS `.app` bundle from a GitHub Release. It is not available in development mode or when running the raw binary directly.
 
 ### 2. Configuration File
 
