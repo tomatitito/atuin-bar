@@ -77,8 +77,8 @@ jobs:
           git tag "${tag}"
           git push origin "${tag}"
 
-          echo "Created ${tag}; the tag push will run the release build."
-          echo "should_release=false" >> "${GITHUB_OUTPUT}"
+          echo "Created ${tag}; building release in this run."
+          echo "should_release=true" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
