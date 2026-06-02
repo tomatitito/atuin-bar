@@ -1,6 +1,6 @@
 [package]
 name = "atuin-bar"
-version = "0.2.1"
+version = "0.2.2"
 description = "Spotlight-like overlay interface for atuin shell history search"
 authors = []
 edition = "2021"
