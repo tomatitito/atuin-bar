@@ -6,6 +6,27 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::ShortcutState;
 
+fn open_settings_window(app: &tauri::AppHandle) {
+    if let Some(settings_window) = app.get_webview_window("settings") {
+        let _ = settings_window.show();
+        let _ = settings_window.set_focus();
+    } else {
+        use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+        let settings_window =
+            WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+                .title("Atuin Bar Settings")
+                .inner_size(500.0, 500.0)
+                .resizable(false)
+                .center()
+                .build();
+
+        if let Ok(win) = settings_window {
+            let _ = win.show();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     log_debug("=== atuin-bar starting ===");
@@ -77,28 +98,7 @@ pub fn run() {
 
             app.on_menu_event(move |app, event| {
                 if event.id().as_ref() == "settings" {
-                    if let Some(settings_window) = app.get_webview_window("settings") {
-                        let _ = settings_window.show();
-                        let _ = settings_window.set_focus();
-                    } else {
-                        use tauri::WebviewUrl;
-                        use tauri::WebviewWindowBuilder;
-
-                        let settings_window = WebviewWindowBuilder::new(
-                            app,
-                            "settings",
-                            WebviewUrl::App("settings.html".into()),
-                        )
-                        .title("Atuin Bar Settings")
-                        .inner_size(500.0, 500.0)
-                        .resizable(false)
-                        .center()
-                        .build();
-
-                        if let Ok(win) = settings_window {
-                            let _ = win.show();
-                        }
-                    }
+                    open_settings_window(app);
                 }
             });
 
