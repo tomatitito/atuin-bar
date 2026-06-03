@@ -4,7 +4,21 @@ use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     Manager,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_global_shortcut::ShortcutState;
+
+fn show_message(
+    app: &tauri::AppHandle,
+    title: &str,
+    message: impl Into<String>,
+    kind: MessageDialogKind,
+) {
+    app.dialog()
+        .message(message)
+        .title(title)
+        .kind(kind)
+        .show(|_| {});
+}
 
 fn open_settings_window(app: &tauri::AppHandle) {
     if let Some(settings_window) = app.get_webview_window("settings") {
@@ -92,14 +106,43 @@ pub fn run() {
             });
 
             let settings_item = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
-            let menu = MenuBuilder::new(app).item(&settings_item).build()?;
+            let check_updates_item =
+                MenuItemBuilder::with_id("check_updates", "Check for Updates...").build(app)?;
+            let menu = MenuBuilder::new(app)
+                .items(&[&settings_item, &check_updates_item])
+                .build()?;
 
             app.set_menu(menu)?;
 
-            app.on_menu_event(move |app, event| {
-                if event.id().as_ref() == "settings" {
-                    open_settings_window(app);
+            app.on_menu_event(move |app, event| match event.id().as_ref() {
+                "settings" => open_settings_window(app),
+                "check_updates" => {
+                    let app_handle = app.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        match crate::updater::self_update(app_handle.clone()).await {
+                            Ok(result) => {
+                                if !result.updated {
+                                    show_message(
+                                        &app_handle,
+                                        "atuin-bar",
+                                        result.message,
+                                        MessageDialogKind::Info,
+                                    );
+                                }
+                            }
+                            Err(error) => {
+                                show_message(
+                                    &app_handle,
+                                    "Update Failed",
+                                    error,
+                                    MessageDialogKind::Error,
+                                );
+                            }
+                        }
+                    });
                 }
+                _ => {}
             });
 
             Ok(())
