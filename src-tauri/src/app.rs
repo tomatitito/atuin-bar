@@ -2,6 +2,7 @@ use crate::config::load_config;
 use crate::logging::log_debug;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
+    tray::TrayIconBuilder,
     Manager,
 };
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
@@ -112,7 +113,17 @@ pub fn run() {
                 .items(&[&settings_item, &check_updates_item])
                 .build()?;
 
-            app.set_menu(menu)?;
+            app.set_menu(menu.clone())?;
+
+            let tray = TrayIconBuilder::with_id("main")
+                .menu(&menu)
+                .tooltip("atuin-bar")
+                .icon(tauri::image::Image::from_bytes(include_bytes!(
+                    "../icons/32x32.png"
+                ))?)
+                .icon_as_template(false)
+                .build(app)?;
+            app.manage(tray);
 
             app.on_menu_event(move |app, event| match event.id().as_ref() {
                 "settings" => open_settings_window(app),
